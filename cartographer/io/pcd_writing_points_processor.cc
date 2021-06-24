@@ -97,6 +97,8 @@ PointsProcessor::FlushResult PcdWritingPointsProcessor::Flush() {
   WriteBinaryPcdHeader(has_colors_, num_points_, file_writer_.get());
   CHECK(file_writer_->Close());
 
+  LOG(INFO) << "Successfully saved pcd point cloud to " << file_writer_->GetFilename() <<"\n";
+
   switch (next_->Flush()) {
     case FlushResult::kFinished:
       return FlushResult::kFinished;

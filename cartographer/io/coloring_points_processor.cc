@@ -43,7 +43,7 @@ ColoringPointsProcessor::ColoringPointsProcessor(const FloatColor& color,
     : color_(color), frame_id_(frame_id), next_(next) {}
 
 void ColoringPointsProcessor::Process(std::unique_ptr<PointsBatch> batch) {
-  if (batch->frame_id == frame_id_) {
+  if (batch->frame_id == frame_id_ || frame_id_ == "") {
     batch->colors.clear();
     for (size_t i = 0; i < batch->points.size(); ++i) {
       batch->colors.push_back(color_);
