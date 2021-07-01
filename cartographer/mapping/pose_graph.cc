@@ -102,7 +102,7 @@ proto::PoseGraphOptions CreatePoseGraphOptions(
           parameter_dictionary->GetDictionary("optimization_problem").get());
   options.set_max_num_final_iterations(
       parameter_dictionary->GetNonNegativeInt("max_num_final_iterations"));
-  CHECK_GT(options.max_num_final_iterations(), 0);
+  CHECK_GE(options.max_num_final_iterations(), 0);
   options.set_global_sampling_ratio(
       parameter_dictionary->GetDouble("global_sampling_ratio"));
   options.set_log_residual_histograms(
