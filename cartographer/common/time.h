@@ -18,8 +18,9 @@
 #define CARTOGRAPHER_COMMON_TIME_H_
 
 #include <chrono>
-#include <ostream>
+#include <iostream>
 #include <ratio>
+#include <vector>
 
 #include "cartographer/common/port.h"
 
@@ -62,6 +63,40 @@ std::ostream& operator<<(std::ostream& os, Time time);
 
 // CPU time consumed by the thread so far, in seconds.
 double GetThreadCpuTimeSeconds();
+
+class TimeMeasurer {
+ public:
+  TimeMeasurer(std::string name, bool print_results_on_destruction);
+  ~TimeMeasurer();
+
+  void StartMeasurement();
+  void StopMeasurement();
+
+ private:
+  std::string name_;
+  bool print_results_on_destruction_;
+  std::chrono::time_point<std::chrono::steady_clock> start_time_;
+  std::vector<double> time_measurements_;
+  bool is_measuring_;
+  pthread_t thread_id_;
+};
+
+#define MEASURE_TIME_FROM_HERE(name) \
+  static cartographer::common::TimeMeasurer (name ## _time_measurer)(#name, true); \
+  (name ## _time_measurer).StartMeasurement()
+
+#define STOP_TIME_MESUREMENT(name) \
+  (name ## _time_measurer).StopMeasurement()
+
+#define MEASURE_BLOCK_TIME(name) \
+  static cartographer::common::TimeMeasurer (name ## _time_measurer)(#name, true); \
+  class name ## _time_measurer_stop_trigger_class { \
+   public: \
+    (name ## _time_measurer_stop_trigger_class)() {}; \
+    (~name ## _time_measurer_stop_trigger_class)() {(name ## _time_measurer).StopMeasurement();}; \
+  }; \
+  name ## _time_measurer_stop_trigger_class    name ## _time_measurer_stop_trigger; \
+  (name ## _time_measurer).StartMeasurement()
 
 }  // namespace common
 }  // namespace cartographer
