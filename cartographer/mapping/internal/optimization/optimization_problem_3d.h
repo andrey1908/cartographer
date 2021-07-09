@@ -123,7 +123,11 @@ class OptimizationProblem3D
       const NodeSpec3D& second_node_data) const;
 
   optimization::proto::OptimizationProblemOptions options_;
+  //// Global and local poses of all nodes. Global poses are computed using global pose of the submap before the last one.
+  //// Global poses are corrected after optimization.
   MapById<NodeId, NodeSpec3D> node_data_;
+  //// Global poses of submaps. Global poses are computed using global pose of the last submap.
+  //// Global poses are corrected after optimization.
   MapById<SubmapId, SubmapSpec3D> submap_data_;
   std::map<std::string, transform::Rigid3d> landmark_data_;
   sensor::MapByTime<sensor::ImuData> imu_data_;

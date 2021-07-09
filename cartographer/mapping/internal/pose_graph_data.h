@@ -62,13 +62,16 @@ struct InternalSubmapData {
 struct PoseGraphData {
   // Submaps get assigned an ID and state as soon as they are seen, even
   // before they take part in the background computations.
+  //// Does not contain global submap poses.
   MapById<SubmapId, InternalSubmapData> submap_data;
 
   // Global submap poses currently used for displaying data.
+  //// Global submap poses after optimization.
   MapById<SubmapId, optimization::SubmapSpec2D> global_submap_poses_2d;
   MapById<SubmapId, optimization::SubmapSpec3D> global_submap_poses_3d;
 
   // Data that are currently being shown.
+  //// Global node poses are computed using global pose of the last optimized submap and corrected after optimization.
   MapById<NodeId, TrajectoryNode> trajectory_nodes;
 
   // Global landmark poses with all observations.
