@@ -59,6 +59,7 @@ CollatedTrajectoryBuilder::CollatedTrajectoryBuilder(
 }
 
 void CollatedTrajectoryBuilder::AddData(std::unique_ptr<sensor::Data> data) {
+  MEASURE_BLOCK_TIME(with_synchronization);
   sensor_collator_->AddSensorData(trajectory_id_, std::move(data));
 }
 
