@@ -56,7 +56,7 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
   void AddSensorData(
       const std::string& sensor_id,
       const sensor::TimedPointCloudData& timed_point_cloud_data) override {
-    MEASURE_BLOCK_TIME(point_cloud);
+    MEASURE_TIME_FROM_HERE(point_cloud);
     CHECK(local_trajectory_builder_)
         << "Cannot add TimedPointCloudData without a LocalTrajectoryBuilder.";
     std::unique_ptr<typename LocalTrajectoryBuilder::MatchingResult>
@@ -80,6 +80,7 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
               matching_result->insertion_result->insertion_submaps.begin(),
               matching_result->insertion_result->insertion_submaps.end())});
     }
+    STOP_TIME_MESUREMENT(point_cloud);
     if (local_slam_result_callback_) {
       local_slam_result_callback_(
           trajectory_id_, matching_result->time, matching_result->local_pose,
