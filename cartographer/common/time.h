@@ -21,8 +21,10 @@
 #include <iostream>
 #include <ratio>
 #include <vector>
+#include <map>
 
 #include "cartographer/common/port.h"
+#include "absl/synchronization/mutex.h"
 
 namespace cartographer {
 namespace common {
@@ -73,12 +75,11 @@ class TimeMeasurer {
   void StopMeasurement();
 
  private:
+  absl::Mutex mutex_;
   std::string name_;
   bool print_results_on_destruction_;
-  std::chrono::time_point<std::chrono::steady_clock> start_time_;
+  std::map<pthread_t, std::chrono::time_point<std::chrono::steady_clock>> start_time_;
   std::vector<double> time_measurements_;
-  bool is_measuring_;
-  pthread_t thread_id_;
 };
 
 #define MEASURE_TIME_FROM_HERE(name) \

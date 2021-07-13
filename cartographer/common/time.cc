@@ -67,34 +67,27 @@ double GetThreadCpuTimeSeconds() {
 #endif
 }
 
-TimeMeasurer::TimeMeasurer(std::string name="Time measurer", bool print_results_on_destruction=false)
-    : name_(name),
-      print_results_on_destruction_(print_results_on_destruction),
-      is_measuring_(false),
-      thread_id_(0) {}
+TimeMeasurer::TimeMeasurer(std::string name="Time measurer", bool print_results_on_destruction=false) {
+  absl::MutexLock locker(&mutex_);
+  name_ = name;
+  print_results_on_destruction_ = print_results_on_destruction;
+}
 
 void TimeMeasurer::StartMeasurement() {
-  if (thread_id_ == 0) {
-    thread_id_ = pthread_self();
-  } else {
-    CHECK_EQ(thread_id_, pthread_self());
-  }
-  CHECK(!is_measuring_);
-  is_measuring_ = true;
-  start_time_ = std::chrono::steady_clock::now();
+  absl::MutexLock locker(&mutex_);
+  start_time_[pthread_self()] = std::chrono::steady_clock::now();
 }
 
 void TimeMeasurer::StopMeasurement() {
   auto stop_time = std::chrono::steady_clock::now();
-  CHECK_EQ(thread_id_, pthread_self());
-  CHECK(is_measuring_);
-  double measured_time = ToSeconds(stop_time - start_time_);
+  absl::MutexLock locker(&mutex_);
+  double measured_time = ToSeconds(stop_time - start_time_[pthread_self()]);
   time_measurements_.push_back(measured_time);
-  is_measuring_ = false;
 }
 
 TimeMeasurer::~TimeMeasurer() {
-  if (print_results_on_destruction_) {
+  absl::MutexLock locker(&mutex_);
+  if (print_results_on_destruction_ && time_measurements_.size()) {
     double total_measured_time = 0.;
     double avarage_time = 0.;
     for (auto measured_time : time_measurements_) {
@@ -107,6 +100,7 @@ TimeMeasurer::~TimeMeasurer() {
     log_string += "    Number of measurements: " + std::to_string(time_measurements_.size()) + "\n";
     log_string += "    Total measured time: " + std::to_string(total_measured_time) + "\n";
     log_string += "    Average time: " + std::to_string(avarage_time) + "\n";
+    log_string += "    Number of threads: " + std::to_string(start_time_.size()) + "\n";
 
     std::cout << log_string;
   }
