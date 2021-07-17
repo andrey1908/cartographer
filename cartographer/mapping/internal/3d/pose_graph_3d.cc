@@ -431,7 +431,7 @@ void PoseGraph3D::DeleteTrajectoriesIfNeeded() {
 void PoseGraph3D::HandleWorkQueue(
     const constraints::ConstraintBuilder3D::Result& result) {
   {
-    LOG(INFO) << "New non-odometry constraints: " << result.size();
+    // LOG(INFO) << "New non-odometry constraints: " << result.size();
     absl::MutexLock locker(&mutex_);
     data_.constraints.insert(data_.constraints.end(), result.begin(),
                              result.end());

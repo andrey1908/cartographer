@@ -101,6 +101,7 @@ void ConstraintBuilder2D::MaybeAddConstraint(
       DispatchScanMatcherConstruction(submap_id, submap->grid());
   auto constraint_task = absl::make_unique<common::Task>();
   constraint_task->SetWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+    MEASURE_BLOCK_TIME(compute_local_constraint);
     ComputeConstraint(submap_id, submap, node_id, false, /* match_full_submap */
                       constant_data, initial_relative_pose, *scan_matcher,
                       constraint);
@@ -126,6 +127,7 @@ void ConstraintBuilder2D::MaybeAddGlobalConstraint(
       DispatchScanMatcherConstruction(submap_id, submap->grid());
   auto constraint_task = absl::make_unique<common::Task>();
   constraint_task->SetWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+    MEASURE_BLOCK_TIME(compute_global_constraint);
     ComputeConstraint(submap_id, submap, node_id, true, /* match_full_submap */
                       constant_data, transform::Rigid2d::Identity(),
                       *scan_matcher, constraint);
@@ -192,6 +194,14 @@ void ConstraintBuilder2D::ComputeConstraint(
     const transform::Rigid2d& initial_relative_pose,
     const SubmapScanMatcher& submap_scan_matcher,
     std::unique_ptr<ConstraintBuilder2D::Constraint>* constraint) {
+  static common::TimeMeasurer compute_successful_global_constraint_time_measurer("compute_successful_global_constraint", true);
+  static common::TimeMeasurer compute_successful_local_constraint_time_measurer("compute_successful_local_constraint", true);
+  if (match_full_submap) {
+    compute_successful_global_constraint_time_measurer.StartMeasurement();
+  } else {
+    compute_successful_local_constraint_time_measurer.StartMeasurement();
+  }
+  // LOG(INFO) << "Try to compute constraint between node and submap: " << node_id << ", " << submap_id;
   CHECK(submap_scan_matcher.fast_correlative_scan_matcher);
   const transform::Rigid2d initial_pose =
       ComputeSubmapPose(*submap) * initial_relative_pose;
@@ -273,6 +283,12 @@ void ConstraintBuilder2D::ComputeConstraint(
     }
     info << " with score " << std::setprecision(1) << 100. * score << "%.";
     LOG(INFO) << info.str();
+  }
+
+  if (match_full_submap) {
+    compute_successful_global_constraint_time_measurer.StopMeasurement();
+  } else {
+    compute_successful_local_constraint_time_measurer.StopMeasurement();
   }
 }
 

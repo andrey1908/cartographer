@@ -444,11 +444,19 @@ void PoseGraph2D::DeleteTrajectoriesIfNeeded() {
 void PoseGraph2D::HandleWorkQueue(
     const constraints::ConstraintBuilder2D::Result& result) {
   {
+    // LOG(INFO) << "New non-odometry constraints: " << result.size();
     absl::MutexLock locker(&mutex_);
     data_.constraints.insert(data_.constraints.end(), result.begin(),
                              result.end());
   }
+
+  LOG(INFO) << "Optimizing...";
+
+  MEASURE_TIME_FROM_HERE(optimization);
   RunOptimization();
+  STOP_TIME_MESUREMENT(optimization);
+
+  LOG(INFO) << "Optimization is done!";
 
   if (global_slam_optimization_callback_) {
     std::map<int, NodeId> trajectory_id_to_last_optimized_node_id;
@@ -520,6 +528,18 @@ void PoseGraph2D::HandleWorkQueue(
 void PoseGraph2D::DrainWorkQueue() {
   bool process_work_queue = true;
   size_t work_queue_size;
+  {
+    absl::MutexLock locker(&work_queue_mutex_);
+    static auto last_log_time = std::chrono::steady_clock::now();
+    static int max_queue_size = 0;
+    max_queue_size = max_queue_size < work_queue_->size() ? work_queue_->size() : max_queue_size;
+    auto now_time = std::chrono::steady_clock::now();
+    if (common::ToSeconds(now_time - last_log_time) > 3) {
+      last_log_time = now_time;
+      LOG(INFO) << "Work items in queue: " << max_queue_size;
+      max_queue_size = 0;
+    }
+  }
   while (process_work_queue) {
     std::function<WorkItem::Result()> work_item;
     {
@@ -535,7 +555,7 @@ void PoseGraph2D::DrainWorkQueue() {
     }
     process_work_queue = work_item() == WorkItem::Result::kDoNotRunOptimization;
   }
-  LOG(INFO) << "Remaining work items in queue: " << work_queue_size;
+  LOG(INFO) << "Optimization requested.";
   // We have to optimize again.
   constraint_builder_.WhenDone(
       [this](const constraints::ConstraintBuilder2D::Result& result) {
