@@ -90,8 +90,10 @@ TimeMeasurer::~TimeMeasurer() {
   if (print_results_on_destruction_ && time_measurements_.size()) {
     double total_measured_time = 0.;
     double avarage_time = 0.;
+    double max_time = 0;
     for (auto measured_time : time_measurements_) {
       total_measured_time += measured_time;
+      max_time = max_time > measured_time ? max_time : measured_time;
     }
     avarage_time = total_measured_time / time_measurements_.size();
 
@@ -100,6 +102,7 @@ TimeMeasurer::~TimeMeasurer() {
     log_string += "    Number of measurements: " + std::to_string(time_measurements_.size()) + "\n";
     log_string += "    Total measured time: " + std::to_string(total_measured_time) + "\n";
     log_string += "    Average time: " + std::to_string(avarage_time) + "\n";
+    log_string += "    Max time: " + std::to_string(max_time) + "\n";
     log_string += "    Number of threads: " + std::to_string(start_time_.size()) + "\n";
 
     std::cout << log_string;
