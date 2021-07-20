@@ -74,6 +74,8 @@ class TimeMeasurer {
   void StartMeasurement();
   void StopMeasurement();
 
+  void AddMeasurement(double measured_time);
+
  private:
   absl::Mutex mutex_;
   std::string name_;

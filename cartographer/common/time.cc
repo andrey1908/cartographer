@@ -85,6 +85,12 @@ void TimeMeasurer::StopMeasurement() {
   time_measurements_.push_back(measured_time);
 }
 
+void TimeMeasurer::AddMeasurement(double measured_time) {
+  absl::MutexLock locker(&mutex_);
+  start_time_[pthread_self()];
+  time_measurements_.push_back(measured_time);
+}
+
 TimeMeasurer::~TimeMeasurer() {
   absl::MutexLock locker(&mutex_);
   if (print_results_on_destruction_ && time_measurements_.size()) {
