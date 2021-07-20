@@ -528,18 +528,35 @@ void PoseGraph2D::HandleWorkQueue(
 void PoseGraph2D::DrainWorkQueue() {
   bool process_work_queue = true;
   size_t work_queue_size;
+
+  static auto last_log_time = std::chrono::steady_clock::now();
+  static long unsigned int max_queue_size = 0;
   {
     absl::MutexLock locker(&work_queue_mutex_);
-    static auto last_log_time = std::chrono::steady_clock::now();
-    static int max_queue_size = 0;
     max_queue_size = max_queue_size < work_queue_->size() ? work_queue_->size() : max_queue_size;
-    auto now_time = std::chrono::steady_clock::now();
-    if (common::ToSeconds(now_time - last_log_time) > 3) {
-      last_log_time = now_time;
-      LOG(INFO) << "Work items in queue: " << max_queue_size;
-      max_queue_size = 0;
-    }
   }
+  auto now_time = std::chrono::steady_clock::now();
+  if (common::ToSeconds(now_time - last_log_time) > 3) {
+    static std::unique_ptr<std::vector<long unsigned int>, std::function<void(std::vector<long unsigned int>*)>> max_queue_size_list_ptr(
+      new std::vector<long unsigned int>, 
+      [](std::vector<long unsigned int>* list_ptr){
+        std::string log_string;
+        log_string += "Max queue size list:\n";
+        log_string += "    ";
+        for (auto max_queue_size : *list_ptr) {
+          log_string += std::to_string(max_queue_size) + " ";
+        }
+        log_string += "\n";
+        std::cout << log_string;
+        delete list_ptr;
+      });
+    max_queue_size_list_ptr->push_back(max_queue_size);
+    last_log_time = now_time;
+    LOG(INFO) << "Work items in queue: " << max_queue_size;
+    max_queue_size = 0;
+  }
+
+  static common::TimeMeasurer work_item_processing_latency("work_item_processing_latency", true);
   while (process_work_queue) {
     std::function<WorkItem::Result()> work_item;
     {
@@ -548,6 +565,9 @@ void PoseGraph2D::DrainWorkQueue() {
         work_queue_.reset();
         return;
       }
+      auto add_time = work_queue_->front().time;
+      auto now_time = std::chrono::steady_clock::now();
+      work_item_processing_latency.AddMeasurement(common::ToSeconds(now_time - add_time));
       work_item = work_queue_->front().task;
       work_queue_->pop_front();
       work_queue_size = work_queue_->size();
