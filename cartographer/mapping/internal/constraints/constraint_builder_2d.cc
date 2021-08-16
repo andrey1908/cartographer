@@ -267,6 +267,15 @@ void ConstraintBuilder2D::ComputeConstraint(
                                     options_.loop_closure_rotation_weight()},
                                    Constraint::INTER_SUBMAP});
 
+  if (options_.log_constraints()) {
+    std::ostringstream info;
+    if (match_full_submap) {
+      info << "Global. ";
+    }
+    info << "Node " << node_id << ", submap " << submap_id << ", score " << std::setprecision(3) << score;
+    LOG(INFO) << info.str();
+  }
+
   if (options_.log_matches()) {
     std::ostringstream info;
     info << "Node " << node_id << " with "
