@@ -25,4 +25,7 @@ message MotionFilterOptions {
 
   // Threshold above which range data is inserted based on rotational motion.
   double max_angle_radians = 3;
+  
+  // Enables logging of the number of nodes after reduction
+  double log_number_of_nodes_after_reduction = 4;
 }

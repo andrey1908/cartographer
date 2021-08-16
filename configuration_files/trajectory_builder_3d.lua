@@ -63,6 +63,7 @@ TRAJECTORY_BUILDER_3D = {
     max_time_seconds = 0.5,
     max_distance_meters = 0.1,
     max_angle_radians = 0.004,
+    log_number_of_nodes_after_reduction = true,
   },
 
   rotational_histogram_size = 120,

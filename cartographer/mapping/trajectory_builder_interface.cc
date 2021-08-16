@@ -52,6 +52,8 @@ void PopulatePoseGraphOdometryMotionFilterOptions(
       options_dictionary->GetDouble("max_distance_meters"));
   options->set_max_angle_radians(
       options_dictionary->GetDouble("max_angle_radians"));
+  options->set_log_number_of_nodes_after_reduction(
+      options_dictionary->GetBool("log_number_of_nodes_after_reduction"));
 }
 
 }  // namespace

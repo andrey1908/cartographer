@@ -57,6 +57,7 @@ TRAJECTORY_BUILDER_2D = {
     max_time_seconds = 5.,
     max_distance_meters = 0.2,
     max_angle_radians = math.rad(1.),
+    log_number_of_nodes_after_reduction = true,
   },
 
   -- TODO(schwoere,wohe): Remove this constant. This is only kept for ROS.
