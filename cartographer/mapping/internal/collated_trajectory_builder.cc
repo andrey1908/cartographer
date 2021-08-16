@@ -36,6 +36,7 @@ CollatedTrajectoryBuilder::CollatedTrajectoryBuilder(
     : sensor_collator_(sensor_collator),
       collate_landmarks_(trajectory_options.collate_landmarks()),
       collate_fixed_frame_(trajectory_options.collate_fixed_frame()),
+      log_data_frequency_(trajectory_options.log_data_frequency()),
       trajectory_id_(trajectory_id),
       wrapped_trajectory_builder_(std::move(wrapped_trajectory_builder)),
       last_logging_time_(std::chrono::steady_clock::now()) {
@@ -76,12 +77,14 @@ void CollatedTrajectoryBuilder::HandleCollatedSensorData(
   }
   it->second.Pulse(data->GetTime());
 
-  if (std::chrono::steady_clock::now() - last_logging_time_ >
-      common::FromSeconds(kSensorDataRatesLoggingPeriodSeconds)) {
-    for (const auto& pair : rate_timers_) {
-      LOG(INFO) << pair.first << " rate: " << pair.second.DebugString();
+  if (log_data_frequency_) {
+    if (std::chrono::steady_clock::now() - last_logging_time_ >
+        common::FromSeconds(kSensorDataRatesLoggingPeriodSeconds)) {
+      for (const auto& pair : rate_timers_) {
+        LOG(INFO) << pair.first << " rate: " << pair.second.DebugString();
+      }
+      last_logging_time_ = std::chrono::steady_clock::now();
     }
-    last_logging_time_ = std::chrono::steady_clock::now();
   }
 
   data->AddToTrajectoryBuilder(wrapped_trajectory_builder_.get());

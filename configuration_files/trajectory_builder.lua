@@ -23,4 +23,5 @@ TRAJECTORY_BUILDER = {
 --  },
   collate_fixed_frame = true,
   collate_landmarks = false,
+  log_data_frequency = true,
 }

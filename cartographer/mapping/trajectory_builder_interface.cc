@@ -71,6 +71,8 @@ proto::TrajectoryBuilderOptions CreateTrajectoryBuilderOptions(
       parameter_dictionary->GetBool("collate_fixed_frame"));
   options.set_collate_landmarks(
       parameter_dictionary->GetBool("collate_landmarks"));
+  options.set_log_data_frequency(
+      parameter_dictionary->GetBool("log_data_frequency"));
   PopulatePureLocalizationTrimmerOptions(&options, parameter_dictionary);
   PopulatePoseGraphOdometryMotionFilterOptions(&options, parameter_dictionary);
   return options;
