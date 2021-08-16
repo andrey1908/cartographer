@@ -49,6 +49,8 @@
   <depend>libgoogle-glog-dev</depend>
   <depend>lua5.2-dev</depend>
   <depend>protobuf-dev</depend>
+  
+  <depend>time_measurer</depend>
 
   <export>
     <build_type>cmake</build_type>

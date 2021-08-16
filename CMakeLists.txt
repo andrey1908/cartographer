@@ -29,6 +29,8 @@ include("${PROJECT_SOURCE_DIR}/cmake/functions.cmake")
 google_initialize_cartographer_project()
 google_enable_testing()
 
+find_package(time_measurer REQUIRED)
+
 find_package(absl REQUIRED)
 set(BOOST_COMPONENTS iostreams)
 if(WIN32)
@@ -223,6 +225,10 @@ if(${BUILD_GRPC})
     target_link_libraries(cartographer_grpc_server PUBLIC prometheus-cpp-pull)
   endif()
 endif()
+
+target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
+  "${time_measurer_INCLUDE_DIRS}")
+target_link_libraries(${PROJECT_NAME} PUBLIC ${time_measurer_LIBRARIES})
 
 target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
   "${EIGEN3_INCLUDE_DIR}")

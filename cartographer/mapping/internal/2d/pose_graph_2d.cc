@@ -556,7 +556,7 @@ void PoseGraph2D::DrainWorkQueue() {
     max_queue_size = 0;
   }
 
-  static common::TimeMeasurer work_item_processing_latency("work_item_processing_latency", true);
+  static time_measurer::TimeMeasurer work_item_processing_latency("work_item_processing_latency", true);
   while (process_work_queue) {
     std::function<WorkItem::Result()> work_item;
     {
