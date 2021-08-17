@@ -64,7 +64,7 @@ class ConstraintBuilder3D {
   using Result = std::vector<Constraint>;
 
   ConstraintBuilder3D(const proto::ConstraintBuilderOptions& options,
-                      common::ThreadPoolInterface* thread_pool);
+                      common::ThreadPoolInterface* thread_pool, int num_range_data = 0);
   ~ConstraintBuilder3D();
 
   ConstraintBuilder3D(const ConstraintBuilder3D&) = delete;
@@ -146,6 +146,7 @@ class ConstraintBuilder3D {
 
   const proto::ConstraintBuilderOptions options_;
   common::ThreadPoolInterface* thread_pool_;
+  int num_range_data_;
   absl::Mutex mutex_;
 
   // 'callback' set by WhenDone().

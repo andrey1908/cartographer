@@ -50,10 +50,10 @@ static auto* kDeletedSubmapsMetric = metrics::Gauge::Null();
 PoseGraph3D::PoseGraph3D(
     const proto::PoseGraphOptions& options,
     std::unique_ptr<optimization::OptimizationProblem3D> optimization_problem,
-    common::ThreadPool* thread_pool)
+    common::ThreadPool* thread_pool, int num_range_data /* 0 */)
     : options_(options),
       optimization_problem_(std::move(optimization_problem)),
-      constraint_builder_(options_.constraint_builder_options(), thread_pool),
+      constraint_builder_(options_.constraint_builder_options(), thread_pool, num_range_data),
       thread_pool_(thread_pool) {}
 
 PoseGraph3D::~PoseGraph3D() {

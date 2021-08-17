@@ -66,7 +66,7 @@ class PoseGraph3D : public PoseGraph {
   PoseGraph3D(
       const proto::PoseGraphOptions& options,
       std::unique_ptr<optimization::OptimizationProblem3D> optimization_problem,
-      common::ThreadPool* thread_pool);
+      common::ThreadPool* thread_pool, int num_range_data = 0);
   ~PoseGraph3D() override;
 
   PoseGraph3D(const PoseGraph3D&) = delete;

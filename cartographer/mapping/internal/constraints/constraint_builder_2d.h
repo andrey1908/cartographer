@@ -65,7 +65,7 @@ class ConstraintBuilder2D {
   using Result = std::vector<Constraint>;
 
   ConstraintBuilder2D(const proto::ConstraintBuilderOptions& options,
-                      common::ThreadPoolInterface* thread_pool);
+                      common::ThreadPoolInterface* thread_pool, int num_range_data = 0);
   ~ConstraintBuilder2D();
 
   ConstraintBuilder2D(const ConstraintBuilder2D&) = delete;
@@ -137,6 +137,7 @@ class ConstraintBuilder2D {
 
   const constraints::proto::ConstraintBuilderOptions options_;
   common::ThreadPoolInterface* thread_pool_;
+  int num_range_data_;
   absl::Mutex mutex_;
 
   // 'callback' set by WhenDone().

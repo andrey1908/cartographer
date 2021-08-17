@@ -68,7 +68,7 @@ class PoseGraph2D : public PoseGraph {
   PoseGraph2D(
       const proto::PoseGraphOptions& options,
       std::unique_ptr<optimization::OptimizationProblem2D> optimization_problem,
-      common::ThreadPool* thread_pool);
+      common::ThreadPool* thread_pool, int num_range_data = 0);
   ~PoseGraph2D() override;
 
   PoseGraph2D(const PoseGraph2D&) = delete;

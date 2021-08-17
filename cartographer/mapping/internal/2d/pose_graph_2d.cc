@@ -52,10 +52,10 @@ static auto* kDeletedSubmapsMetric = metrics::Gauge::Null();
 PoseGraph2D::PoseGraph2D(
     const proto::PoseGraphOptions& options,
     std::unique_ptr<optimization::OptimizationProblem2D> optimization_problem,
-    common::ThreadPool* thread_pool)
+    common::ThreadPool* thread_pool, int num_range_data /* 0 */)
     : options_(options),
       optimization_problem_(std::move(optimization_problem)),
-      constraint_builder_(options_.constraint_builder_options(), thread_pool),
+      constraint_builder_(options_.constraint_builder_options(), thread_pool, num_range_data),
       thread_pool_(thread_pool) {
   if (options.has_overlapping_submaps_trimmer_2d()) {
     const auto& trimmer_options = options.overlapping_submaps_trimmer_2d();

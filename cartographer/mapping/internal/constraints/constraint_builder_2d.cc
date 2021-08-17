@@ -58,9 +58,10 @@ transform::Rigid2d ComputeSubmapPose(const Submap2D& submap) {
 
 ConstraintBuilder2D::ConstraintBuilder2D(
     const constraints::proto::ConstraintBuilderOptions& options,
-    common::ThreadPoolInterface* const thread_pool)
+    common::ThreadPoolInterface* const thread_pool, int num_range_data /* 0 */)
     : options_(options),
       thread_pool_(thread_pool),
+      num_range_data_(num_range_data),
       finish_node_task_(absl::make_unique<common::Task>()),
       when_done_task_(absl::make_unique<common::Task>()),
       ceres_scan_matcher_(options.ceres_scan_matcher_options()) {}
@@ -272,7 +273,13 @@ void ConstraintBuilder2D::ComputeConstraint(
     if (match_full_submap) {
       info << "Global. ";
     }
-    info << "Node " << node_id << ", submap " << submap_id << ", score " << std::setprecision(3) << score;
+    if (num_range_data_ > 0) {
+      SubmapId submap_id_for_node(node_id.trajectory_id, node_id.node_index / num_range_data_);
+      info << "Node from " << submap_id_for_node;
+    } else {
+      info << "Node " << node_id;
+    }
+    info << ", submap " << submap_id << ", score " << std::setprecision(3) << score;
     LOG(INFO) << info.str();
   }
 
