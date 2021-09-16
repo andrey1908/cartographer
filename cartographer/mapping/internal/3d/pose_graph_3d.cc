@@ -133,7 +133,7 @@ NodeId PoseGraph3D::AppendNode(
     const SubmapId submap_id =
         data_.submap_data.Append(trajectory_id, InternalSubmapData());
     data_.submap_data.at(submap_id).submap = insertion_submaps.back();
-    LOG(INFO) << "Inserted submap " << submap_id << ".";
+    // LOG(INFO) << "Inserted submap " << submap_id << ".";
     kActiveSubmapsMetric->Increment();
   }
   return node_id;
@@ -437,13 +437,13 @@ void PoseGraph3D::HandleWorkQueue(
                              result.end());
   }
 
-  LOG(INFO) << "Optimizing...";
+  // LOG(INFO) << "Optimizing...";
 
   MEASURE_TIME_FROM_HERE(optimization);
   RunOptimization();
   STOP_TIME_MESUREMENT(optimization);
 
-  LOG(INFO) << "Optimization is done!";
+  // LOG(INFO) << "Optimization is done!";
 
   if (global_slam_optimization_callback_) {
     std::map<int, NodeId> trajectory_id_to_last_optimized_node_id;
@@ -562,7 +562,7 @@ void PoseGraph3D::DrainWorkQueue() {
     }
     process_work_queue = work_item() == WorkItem::Result::kDoNotRunOptimization;
   }
-  LOG(INFO) << "Optimization requested.";
+  // LOG(INFO) << "Optimization requested.";
   // We have to optimize again.
   constraint_builder_.WhenDone(
       [this](const constraints::ConstraintBuilder3D::Result& result) {
