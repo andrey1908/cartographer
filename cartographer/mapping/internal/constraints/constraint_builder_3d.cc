@@ -82,6 +82,12 @@ void ConstraintBuilder3D::MaybeAddConstraint(
     const NodeId& node_id, const TrajectoryNode::Data* const constant_data,
     const transform::Rigid3d& global_node_pose,
     const transform::Rigid3d& global_submap_pose) {
+  if (num_range_data_ > 0) {
+    int submap_index_for_node = node_id.node_index / num_range_data_;
+    if (submap_index_for_node < submap_id.submap_index && submap_index_for_node >= submap_id.submap_index - 2) {
+      return;
+    }
+  }
   if ((global_node_pose.translation() - global_submap_pose.translation())
           .norm() > options_.max_constraint_distance()) {
     return;
