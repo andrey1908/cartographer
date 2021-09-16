@@ -552,7 +552,9 @@ void PoseGraph2D::DrainWorkQueue() {
       });
     max_queue_size_list_ptr->push_back(max_queue_size);
     last_log_time = now_time;
-    // LOG(INFO) << "Work items in queue: " << max_queue_size;
+    if (options_.log_work_queue_size()) {
+      LOG(INFO) << "Work items in queue: " << max_queue_size;
+    }
     max_queue_size = 0;
   }
 

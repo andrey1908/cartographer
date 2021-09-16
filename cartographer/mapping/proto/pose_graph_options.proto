@@ -48,6 +48,9 @@ message PoseGraphOptions {
   // localization.
   double global_sampling_ratio = 5;
 
+  // Log work queue size.
+  bool log_work_queue_size = 12;
+
   // Whether to output histograms for the pose residuals.
   bool log_residual_histograms = 9;
 
