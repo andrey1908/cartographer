@@ -79,12 +79,12 @@ void ConstraintBuilder2D::MaybeAddConstraint(
     const SubmapId& submap_id, const Submap2D* const submap,
     const NodeId& node_id, const TrajectoryNode::Data* const constant_data,
     const transform::Rigid2d& initial_relative_pose) {
-  if (num_range_data_ > 0) {
-    int submap_index_for_node = node_id.node_index / num_range_data_;
-    if (submap_index_for_node < submap_id.submap_index && submap_index_for_node >= submap_id.submap_index - 2) {
-      return;
-    }
-  }
+  // if (num_range_data_ > 0) {
+  //   int submap_index_for_node = node_id.node_index / num_range_data_;
+  //   if (submap_index_for_node < submap_id.submap_index && submap_index_for_node >= submap_id.submap_index - 2) {
+  //     return;
+  //   }
+  // }
   if (initial_relative_pose.translation().norm() >
       options_.max_constraint_distance()) {
     return;
