@@ -27,8 +27,6 @@
 #include "cartographer/mapping/trajectory_builder_interface.h"
 #include "cartographer/metrics/family_factory.h"
 
-#include "time_measurer.h"
-
 namespace cartographer {
 namespace mapping {
 
