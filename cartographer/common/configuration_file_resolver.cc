@@ -27,28 +27,42 @@ namespace cartographer {
 namespace common {
 
 ConfigurationFileResolver::ConfigurationFileResolver(
-    const std::vector<std::string>& configuration_files_directories)
-    : configuration_files_directories_(configuration_files_directories) {
+    const std::vector<std::string>& configuration_files_directories) {
+  configuration_files_directories_.push_back("");
+  configuration_files_directories_.insert(configuration_files_directories_.end(),
+      configuration_files_directories.begin(), configuration_files_directories.end());
   configuration_files_directories_.push_back(kConfigurationFilesDirectory);
+
+  for (auto it = configuration_files_directories_.begin() + 1;
+        it != configuration_files_directories_.end(); ++it) {
+    if (it->empty()) {
+      *it = "./";
+    } else {
+      *it += '/';
+    }
+  }
 }
 
 std::string ConfigurationFileResolver::GetFullPathOrDie(
-    const std::string& basename) {
+    const std::string& file) {
   for (const auto& path : configuration_files_directories_) {
-    const std::string filename = path + "/" + basename;
+    const std::string filename = path + file;
     std::ifstream stream(filename.c_str());
     if (stream.good()) {
-      LOG(INFO) << "Found '" << filename << "' for '" << basename << "'.";
+      LOG(INFO) << "Found '" << filename << "' for '" << file << "'.";
       return filename;
     }
+    if (file[0] == '/') {
+      break;
+    }
   }
-  LOG(FATAL) << "File '" << basename << "' was not found.";
+  LOG(FATAL) << "File '" << file << "' was not found.";
 }
 
 std::string ConfigurationFileResolver::GetFileContentOrDie(
-    const std::string& basename) {
-  CHECK(!basename.empty()) << "File basename cannot be empty." << basename;
-  const std::string filename = GetFullPathOrDie(basename);
+    const std::string& file) {
+  CHECK(!file.empty()) << "File name cannot be empty." << file;
+  const std::string filename = GetFullPathOrDie(file);
   std::ifstream stream(filename.c_str());
   return std::string((std::istreambuf_iterator<char>(stream)),
                      std::istreambuf_iterator<char>());
