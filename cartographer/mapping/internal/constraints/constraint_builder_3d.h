@@ -44,7 +44,7 @@
 #include "cartographer/sensor/internal/voxel_filter.h"
 #include "cartographer/sensor/point_cloud.h"
 
-#include "time_measurer.h"
+#include "time_measurer/time_measurer.h"
 
 namespace cartographer {
 namespace mapping {

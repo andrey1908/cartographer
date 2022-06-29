@@ -49,7 +49,7 @@
 #include "cartographer/transform/rigid_transform.h"
 #include "cartographer/transform/transform.h"
 
-#include "time_measurer.h"
+#include "time_measurer/time_measurer.h"
 
 namespace cartographer {
 namespace mapping {

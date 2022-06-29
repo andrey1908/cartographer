@@ -441,7 +441,7 @@ void PoseGraph3D::HandleWorkQueue(
 
   MEASURE_TIME_FROM_HERE(optimization);
   RunOptimization();
-  STOP_TIME_MESUREMENT(optimization);
+  STOP_TIME_MEASUREMENT(optimization);
 
   // LOG(INFO) << "Optimization is done!";
 

@@ -26,7 +26,7 @@
 #include "cartographer/metrics/family_factory.h"
 #include "glog/logging.h"
 
-#include "time_measurer.h"
+#include "time_measurer/time_measurer.h"
 
 namespace cartographer {
 namespace mapping {
@@ -66,7 +66,7 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
             sensor_id, timed_point_cloud_data);
     if (matching_result == nullptr) {
       // The range data has not been fully accumulated yet.
-      STOP_TIME_MESUREMENT(point_cloud);
+      STOP_TIME_MEASUREMENT(point_cloud);
       return;
     }
     kLocalSlamMatchingResults->Increment();
@@ -83,7 +83,7 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
               matching_result->insertion_result->insertion_submaps.begin(),
               matching_result->insertion_result->insertion_submaps.end())});
     }
-    STOP_TIME_MESUREMENT(point_cloud);
+    STOP_TIME_MEASUREMENT(point_cloud);
     if (local_slam_result_callback_) {
       local_slam_result_callback_(
           trajectory_id_, matching_result->time, matching_result->local_pose,
