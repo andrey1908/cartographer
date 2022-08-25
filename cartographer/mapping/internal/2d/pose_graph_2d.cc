@@ -458,31 +458,6 @@ void PoseGraph2D::HandleWorkQueue(
 
   // LOG(INFO) << "Optimization is done!";
 
-  if (global_slam_optimization_callback_) {
-    std::map<int, NodeId> trajectory_id_to_last_optimized_node_id;
-    std::map<int, SubmapId> trajectory_id_to_last_optimized_submap_id;
-    {
-      absl::MutexLock locker(&mutex_);
-      const auto& submap_data = optimization_problem_->submap_data();
-      const auto& node_data = optimization_problem_->node_data();
-      for (const int trajectory_id : node_data.trajectory_ids()) {
-        if (node_data.SizeOfTrajectoryOrZero(trajectory_id) == 0 ||
-            submap_data.SizeOfTrajectoryOrZero(trajectory_id) == 0) {
-          continue;
-        }
-        trajectory_id_to_last_optimized_node_id.emplace(
-            trajectory_id,
-            std::prev(node_data.EndOfTrajectory(trajectory_id))->id);
-        trajectory_id_to_last_optimized_submap_id.emplace(
-            trajectory_id,
-            std::prev(submap_data.EndOfTrajectory(trajectory_id))->id);
-      }
-    }
-    global_slam_optimization_callback_(
-        trajectory_id_to_last_optimized_submap_id,
-        trajectory_id_to_last_optimized_node_id);
-  }
-
   {
     absl::MutexLock locker(&mutex_);
     for (const Constraint& constraint : result) {
@@ -520,6 +495,31 @@ void PoseGraph2D::HandleWorkQueue(
     kConstraintsSameTrajectoryMetric->Set(inter_constraints_same_trajectory);
     kConstraintsDifferentTrajectoryMetric->Set(
         inter_constraints_different_trajectory);
+  }
+
+  if (global_slam_optimization_callback_) {
+    std::map<int, NodeId> trajectory_id_to_last_optimized_node_id;
+    std::map<int, SubmapId> trajectory_id_to_last_optimized_submap_id;
+    {
+      absl::MutexLock locker(&mutex_);
+      const auto& submap_data = optimization_problem_->submap_data();
+      const auto& node_data = optimization_problem_->node_data();
+      for (const int trajectory_id : node_data.trajectory_ids()) {
+        if (node_data.SizeOfTrajectoryOrZero(trajectory_id) == 0 ||
+            submap_data.SizeOfTrajectoryOrZero(trajectory_id) == 0) {
+          continue;
+        }
+        trajectory_id_to_last_optimized_node_id.emplace(
+            trajectory_id,
+            std::prev(node_data.EndOfTrajectory(trajectory_id))->id);
+        trajectory_id_to_last_optimized_submap_id.emplace(
+            trajectory_id,
+            std::prev(submap_data.EndOfTrajectory(trajectory_id))->id);
+      }
+    }
+    global_slam_optimization_callback_(
+        trajectory_id_to_last_optimized_submap_id,
+        trajectory_id_to_last_optimized_node_id);
   }
 
   DrainWorkQueue();
