@@ -157,6 +157,9 @@ class PoseGraphInterface {
   // problem is solved.
   virtual void SetGlobalSlamOptimizationCallback(
       GlobalSlamOptimizationCallback callback) = 0;
+
+  // Returns true if trajectories are connected
+  virtual bool TrajectoriesTransitivelyConnected(int trajectory_id_a, int trajectory_id_b) const = 0;
 };
 
 }  // namespace mapping
