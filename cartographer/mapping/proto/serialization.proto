@@ -73,6 +73,11 @@ message SerializationHeader {
   uint32 format_version = 1;
 }
 
+message RosTrajectoryOptions {
+  int32 trajectory_id = 1;
+  string tracking_frame = 2;
+}
+
 message SerializedData {
   oneof data {
     PoseGraph pose_graph = 1;
@@ -84,5 +89,6 @@ message SerializedData {
     OdometryData odometry_data = 7;
     FixedFramePoseData fixed_frame_pose_data = 8;
     LandmarkData landmark_data = 9;
+    RosTrajectoryOptions ros_trajectory_options = 10;
   }
 }

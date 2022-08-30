@@ -33,7 +33,8 @@ void WritePbStream(
     const mapping::PoseGraph& pose_graph,
     const std::vector<mapping::proto::TrajectoryBuilderOptionsWithSensorIds>&
         builder_options,
-    ProtoStreamWriterInterface* const writer, bool include_unfinished_submaps);
+    ProtoStreamWriterInterface* const writer, bool include_unfinished_submaps,
+    const std::vector<mapping::proto::RosTrajectoryOptions>* ros_trajectory_options = nullptr);
 
 }  // namespace io
 }  // namespace cartographer

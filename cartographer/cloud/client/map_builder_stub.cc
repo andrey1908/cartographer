@@ -130,7 +130,9 @@ std::string MapBuilderStub::SubmapToProto(
 }
 
 void MapBuilderStub::SerializeState(bool include_unfinished_submaps,
-                                    io::ProtoStreamWriterInterface* writer) {
+                                    io::ProtoStreamWriterInterface* writer,
+                                    const std::vector<mapping::proto::RosTrajectoryOptions>*
+                                        ros_trajectory_options /* nullptr */) {
   if (include_unfinished_submaps) {
     LOG(WARNING) << "Serializing unfinished submaps is currently unsupported. "
                     "Proceeding to write the state without them.";
@@ -154,7 +156,9 @@ void MapBuilderStub::SerializeState(bool include_unfinished_submaps,
 }
 
 bool MapBuilderStub::SerializeStateToFile(bool include_unfinished_submaps,
-                                          const std::string& filename) {
+                                          const std::string& filename,
+                                          const std::vector<mapping::proto::RosTrajectoryOptions>*
+                                              ros_trajectory_options /* nullptr */) {
   if (include_unfinished_submaps) {
     LOG(WARNING) << "Serializing unfinished submaps is currently unsupported. "
                     "Proceeding to write the state without them.";
@@ -173,7 +177,8 @@ bool MapBuilderStub::SerializeStateToFile(bool include_unfinished_submaps,
 }
 
 std::map<int, int> MapBuilderStub::LoadState(
-    io::ProtoStreamReaderInterface* reader, const bool load_frozen_state) {
+    io::ProtoStreamReaderInterface* reader, const bool load_frozen_state,
+    std::vector<mapping::proto::RosTrajectoryOptions>* ros_trajectory_options /* nullptr */) {
   async_grpc::Client<handlers::LoadStateSignature> client(client_channel_);
   {
     proto::LoadStateRequest request;
@@ -221,7 +226,8 @@ std::map<int, int> MapBuilderStub::LoadState(
 }
 
 std::map<int, int> MapBuilderStub::LoadStateFromFile(
-    const std::string& filename, const bool load_frozen_state) {
+    const std::string& filename, const bool load_frozen_state,
+    std::vector<mapping::proto::RosTrajectoryOptions>* ros_trajectory_options /* nullptr */) {
   proto::LoadStateFromFileRequest request;
   request.set_file_path(filename);
   request.set_client_id(client_id_);
