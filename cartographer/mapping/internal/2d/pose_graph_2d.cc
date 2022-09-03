@@ -1127,6 +1127,11 @@ bool PoseGraph2D::TrajectoriesTransitivelyConnected(int trajectory_id_a, int tra
   return data_.trajectory_connectivity_state.TransitivelyConnected(trajectory_id_a, trajectory_id_b);
 }
 
+common::Time PoseGraph2D::TrajectoriesLastConnectionTime(int trajectory_id_a, int trajectory_id_b) const {
+  absl::MutexLock locker(&mutex_);
+  return data_.trajectory_connectivity_state.LastConnectionTime(trajectory_id_a, trajectory_id_b);
+}
+
 PoseGraphInterface::SubmapData PoseGraph2D::GetSubmapData(
     const SubmapId& submap_id) const {
   absl::MutexLock locker(&mutex_);

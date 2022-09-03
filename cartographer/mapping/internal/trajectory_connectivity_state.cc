@@ -65,9 +65,13 @@ std::vector<std::vector<int>> TrajectoryConnectivityState::Components() const {
 }
 
 common::Time TrajectoryConnectivityState::LastConnectionTime(
-    const int trajectory_id_a, const int trajectory_id_b) {
+    const int trajectory_id_a, const int trajectory_id_b) const {
   const auto sorted_pair = std::minmax(trajectory_id_a, trajectory_id_b);
-  return last_connection_time_map_[sorted_pair];
+  const auto it = last_connection_time_map_.find(sorted_pair);
+  if (it == last_connection_time_map_.end()) {
+    return common::Time();
+  }
+  return it->second;
 }
 
 }  // namespace mapping

@@ -57,7 +57,7 @@ class TrajectoryConnectivityState {
   // Return the last connection count between the two trajectories. If either of
   // the trajectories is untracked or they have never been connected returns the
   // beginning of time.
-  common::Time LastConnectionTime(int trajectory_id_a, int trajectory_id_b);
+  common::Time LastConnectionTime(int trajectory_id_a, int trajectory_id_b) const;
 
  private:
   // ConnectedComponents are thread safe.

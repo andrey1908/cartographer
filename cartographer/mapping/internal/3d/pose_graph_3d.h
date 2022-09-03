@@ -118,6 +118,8 @@ class PoseGraph3D : public PoseGraph {
       LOCKS_EXCLUDED(mutex_);
   bool TrajectoriesTransitivelyConnected(int trajectory_id_a, int trajectory_id_b) const override
       LOCKS_EXCLUDED(mutex_);
+  common::Time TrajectoriesLastConnectionTime(int trajectory_id_a, int trajectory_id_b) const override
+      LOCKS_EXCLUDED(mutex_);
   PoseGraph::SubmapData GetSubmapData(const SubmapId& submap_id) const
       LOCKS_EXCLUDED(mutex_) override;
   MapById<SubmapId, SubmapData> GetAllSubmapData() const

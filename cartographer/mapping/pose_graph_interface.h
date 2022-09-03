@@ -160,6 +160,9 @@ class PoseGraphInterface {
 
   // Returns true if trajectories are connected
   virtual bool TrajectoriesTransitivelyConnected(int trajectory_id_a, int trajectory_id_b) const = 0;
+
+  // Returns latest connection time for trajectories
+  virtual common::Time TrajectoriesLastConnectionTime(int trajectory_id_a, int trajectory_id_b) const = 0;
 };
 
 }  // namespace mapping
