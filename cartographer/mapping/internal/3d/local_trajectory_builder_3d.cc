@@ -20,6 +20,7 @@
 
 #include "absl/memory/memory.h"
 #include "cartographer/common/time.h"
+#include "cartographer/mapping/pose_extrapolator.h"
 #include "cartographer/mapping/internal/3d/scan_matching/rotational_scan_matcher.h"
 #include "cartographer/mapping/proto/local_trajectory_builder_options_3d.pb.h"
 #include "cartographer/mapping/proto/scan_matching/ceres_scan_matcher_options_3d.pb.h"
@@ -109,6 +110,7 @@ std::unique_ptr<transform::Rigid3d> LocalTrajectoryBuilder3D::ScanMatch(
 }
 
 void LocalTrajectoryBuilder3D::AddImuData(const sensor::ImuData& imu_data) {
+  CHECK(options_.use_imu_data()) << "An unexpected IMU packet was added.";
   if (extrapolator_ != nullptr) {
     extrapolator_->AddImuData(imu_data);
     return;
@@ -141,6 +143,12 @@ LocalTrajectoryBuilder3D::AddRangeData(
   if (synchronized_data.ranges.empty()) {
     LOG(INFO) << "Range data collator filling buffer.";
     return nullptr;
+  }
+
+  // Initialize extrapolator now if we do not ever use an IMU.
+  if (!options_.use_imu_data()) {
+    const common::Time& time = synchronized_data.time;
+    InitializeExtrapolator(time);
   }
 
   if (extrapolator_ == nullptr) {
@@ -382,6 +390,22 @@ void LocalTrajectoryBuilder3D::AddOdometryData(
     return;
   }
   extrapolator_->AddOdometryData(odometry_data);
+}
+
+void LocalTrajectoryBuilder3D::InitializeExtrapolator(const common::Time time) {
+  if (extrapolator_ != nullptr) {
+    return;
+  }
+  CHECK(!options_.pose_extrapolator_options().use_imu_based());
+  // TODO(gaschler): Consider using InitializeWithImu as 3D does.
+  extrapolator_ = absl::make_unique<PoseExtrapolator>(
+      ::cartographer::common::FromSeconds(options_.pose_extrapolator_options()
+                                              .constant_velocity()
+                                              .pose_queue_duration()),
+      options_.pose_extrapolator_options()
+          .constant_velocity()
+          .imu_gravity_time_constant());
+  extrapolator_->AddPose(time, transform::Rigid3d::Identity());
 }
 
 std::unique_ptr<LocalTrajectoryBuilder3D::InsertionResult>

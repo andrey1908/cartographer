@@ -16,6 +16,7 @@ MAX_3D_RANGE = 60.
 INTENSITY_THRESHOLD = 40
 
 TRAJECTORY_BUILDER_3D = {
+  use_imu_data = true,
   min_range = 1.,
   max_range = MAX_3D_RANGE,
   num_accumulated_range_data = 1,

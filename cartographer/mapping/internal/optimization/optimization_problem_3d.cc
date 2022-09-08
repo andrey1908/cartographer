@@ -360,6 +360,11 @@ void OptimizationProblem3D::Solve(
         node_it = trajectory_end;
         continue;
       }
+      if (!imu_data_.HasTrajectory(trajectory_id)) {
+        // We skip trajectories with no imu data.
+        node_it = trajectory_end;
+        continue;
+      }
       TrajectoryData& trajectory_data = trajectory_data_.at(trajectory_id);
 
       problem.AddParameterBlock(trajectory_data.imu_calibration.data(), 4,
@@ -368,7 +373,6 @@ void OptimizationProblem3D::Solve(
         problem.SetParameterBlockConstant(
             trajectory_data.imu_calibration.data());
       }
-      CHECK(imu_data_.HasTrajectory(trajectory_id));
       const auto imu_data = imu_data_.trajectory(trajectory_id);
       CHECK(imu_data.begin() != imu_data.end());
 

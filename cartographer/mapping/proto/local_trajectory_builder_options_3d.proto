@@ -76,4 +76,7 @@ message LocalTrajectoryBuilderOptions3D {
 
   // Whether to use Lidar intensities in Ceres Scan Matcher.
   bool use_intensities = 21;
+
+  // True if IMU data should be expected and used.
+  bool use_imu_data = 9;
 }
