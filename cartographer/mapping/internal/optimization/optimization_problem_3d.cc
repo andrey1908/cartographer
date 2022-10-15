@@ -451,7 +451,8 @@ void OptimizationProblem3D::Solve(
     }
   }
 
-  if (options_.fix_z_in_3d()) {
+  if (options_.fix_z_in_3d() || options_.add_local_slam_consecutive_nodes_constraints_in_3d() ||
+      options_.add_odometry_consecutive_nodes_constraints_in_3d()) {
     // Add penalties for violating odometry (if available) and changes between
     // consecutive nodes.
     for (auto node_it = node_data_.begin(); node_it != node_data_.end();) {
@@ -474,33 +475,37 @@ void OptimizationProblem3D::Solve(
           continue;
         }
 
-        // Add a relative pose constraint based on the odometry (if available).
-        const std::unique_ptr<transform::Rigid3d> relative_odometry =
-            CalculateOdometryBetweenNodes(trajectory_id, first_node_data,
-                                          second_node_data);
-        if (relative_odometry != nullptr) {
+        if (options_.fix_z_in_3d() || options_.add_odometry_consecutive_nodes_constraints_in_3d()) {
+          // Add a relative pose constraint based on the odometry (if available).
+          const std::unique_ptr<transform::Rigid3d> relative_odometry =
+              CalculateOdometryBetweenNodes(trajectory_id, first_node_data,
+                                            second_node_data);
+          if (relative_odometry != nullptr) {
+            problem.AddResidualBlock(
+                SpaCostFunction3D::CreateAutoDiffCostFunction(Constraint::Pose{
+                    *relative_odometry, options_.odometry_translation_weight(),
+                    options_.odometry_rotation_weight()}),
+                nullptr /* loss function */, C_nodes.at(first_node_id).rotation(),
+                C_nodes.at(first_node_id).translation(),
+                C_nodes.at(second_node_id).rotation(),
+                C_nodes.at(second_node_id).translation());
+          }
+        }
+
+        if (options_.fix_z_in_3d() || options_.add_local_slam_consecutive_nodes_constraints_in_3d()) {
+          // Add a relative pose constraint based on consecutive local SLAM poses.
+          const transform::Rigid3d relative_local_slam_pose =
+              first_node_data.local_pose.inverse() * second_node_data.local_pose;
           problem.AddResidualBlock(
-              SpaCostFunction3D::CreateAutoDiffCostFunction(Constraint::Pose{
-                  *relative_odometry, options_.odometry_translation_weight(),
-                  options_.odometry_rotation_weight()}),
+              SpaCostFunction3D::CreateAutoDiffCostFunction(
+                  Constraint::Pose{relative_local_slam_pose,
+                                  options_.local_slam_pose_translation_weight(),
+                                  options_.local_slam_pose_rotation_weight()}),
               nullptr /* loss function */, C_nodes.at(first_node_id).rotation(),
               C_nodes.at(first_node_id).translation(),
               C_nodes.at(second_node_id).rotation(),
               C_nodes.at(second_node_id).translation());
         }
-
-        // Add a relative pose constraint based on consecutive local SLAM poses.
-        const transform::Rigid3d relative_local_slam_pose =
-            first_node_data.local_pose.inverse() * second_node_data.local_pose;
-        problem.AddResidualBlock(
-            SpaCostFunction3D::CreateAutoDiffCostFunction(
-                Constraint::Pose{relative_local_slam_pose,
-                                 options_.local_slam_pose_translation_weight(),
-                                 options_.local_slam_pose_rotation_weight()}),
-            nullptr /* loss function */, C_nodes.at(first_node_id).rotation(),
-            C_nodes.at(first_node_id).translation(),
-            C_nodes.at(second_node_id).rotation(),
-            C_nodes.at(second_node_id).translation());
       }
     }
   }
