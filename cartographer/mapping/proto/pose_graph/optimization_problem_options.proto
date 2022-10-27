@@ -64,10 +64,10 @@ message OptimizationProblemOptions {
   bool fix_z_in_3d = 13;
 
   // 3D only: add consecutive nodes constraints based on the local SLAM poses.
-  bool add_local_slam_consecutive_nodes_constraints_in_3d = 2;
+  bool add_local_slam_consecutive_node_constraints_in_3d = 2;
 
   // 3D only: add consecutive nodes constraints based on external odometry.
-  bool add_odometry_consecutive_nodes_constraints_in_3d = 3;
+  bool add_odometry_consecutive_node_constraints_in_3d = 3;
 
   // 3D only: activate online IMU extrinsics.
   bool use_online_imu_extrinsics_in_3d = 18;

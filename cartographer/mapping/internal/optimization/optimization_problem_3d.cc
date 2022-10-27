@@ -451,8 +451,8 @@ void OptimizationProblem3D::Solve(
     }
   }
 
-  if (options_.fix_z_in_3d() || options_.add_local_slam_consecutive_nodes_constraints_in_3d() ||
-      options_.add_odometry_consecutive_nodes_constraints_in_3d()) {
+  if (options_.fix_z_in_3d() || options_.add_local_slam_consecutive_node_constraints_in_3d() ||
+      options_.add_odometry_consecutive_node_constraints_in_3d()) {
     // Add penalties for violating odometry (if available) and changes between
     // consecutive nodes.
     for (auto node_it = node_data_.begin(); node_it != node_data_.end();) {
@@ -475,7 +475,7 @@ void OptimizationProblem3D::Solve(
           continue;
         }
 
-        if (options_.fix_z_in_3d() || options_.add_odometry_consecutive_nodes_constraints_in_3d()) {
+        if (options_.fix_z_in_3d() || options_.add_odometry_consecutive_node_constraints_in_3d()) {
           // Add a relative pose constraint based on the odometry (if available).
           const std::unique_ptr<transform::Rigid3d> relative_odometry =
               CalculateOdometryBetweenNodes(trajectory_id, first_node_data,
@@ -492,7 +492,7 @@ void OptimizationProblem3D::Solve(
           }
         }
 
-        if (options_.fix_z_in_3d() || options_.add_local_slam_consecutive_nodes_constraints_in_3d()) {
+        if (options_.fix_z_in_3d() || options_.add_local_slam_consecutive_node_constraints_in_3d()) {
           // Add a relative pose constraint based on consecutive local SLAM poses.
           const transform::Rigid3d relative_local_slam_pose =
               first_node_data.local_pose.inverse() * second_node_data.local_pose;
