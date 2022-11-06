@@ -163,19 +163,26 @@ class PoseGraph3D : public PoseGraph {
 
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
 
- protected:
   // Waits until we caught up (i.e. nothing is waiting to be scheduled), and
   // all computations have finished.
-  void WaitForAllComputations() LOCKS_EXCLUDED(mutex_)
+  void WaitForAllComputations(bool quiet = false) LOCKS_EXCLUDED(mutex_)
       LOCKS_EXCLUDED(work_queue_mutex_);
 
- private:
-  MapById<SubmapId, SubmapData> GetSubmapDataUnderLock() const
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  // Computes constraints for a node and submap pair.
+  void ComputeConstraint(const NodeId& node_id, const SubmapId& submap_id,
+      bool search_for_local_constraint = false, bool search_for_global_constraint = false)
+      LOCKS_EXCLUDED(mutex_);
 
   // Handles a new work item.
   void AddWorkItem(const std::function<WorkItem::Result()>& work_item)
       LOCKS_EXCLUDED(mutex_) LOCKS_EXCLUDED(work_queue_mutex_);
+
+  void NotifyEndOfNode();
+  void IncNumTrajectoryNodes();
+
+ private:
+  MapById<SubmapId, SubmapData> GetSubmapDataUnderLock() const
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Adds connectivity and sampler for a trajectory if it does not exist.
   void AddTrajectoryIfNeeded(int trajectory_id)
@@ -200,10 +207,6 @@ class PoseGraph3D : public PoseGraph {
       const NodeId& node_id,
       std::vector<std::shared_ptr<const Submap3D>> insertion_submaps,
       bool newly_finished_submap) LOCKS_EXCLUDED(mutex_);
-
-  // Computes constraints for a node and submap pair.
-  void ComputeConstraint(const NodeId& node_id, const SubmapId& submap_id)
-      LOCKS_EXCLUDED(mutex_);
 
   // Deletes trajectories waiting for deletion. Must not be called during
   // constraint search.

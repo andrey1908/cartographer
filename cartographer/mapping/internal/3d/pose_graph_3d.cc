@@ -177,6 +177,15 @@ void PoseGraph3D::AddWorkItem(
           .count());
 }
 
+void PoseGraph3D::NotifyEndOfNode() {
+  constraint_builder_.NotifyEndOfNode();
+}
+
+void PoseGraph3D::IncNumTrajectoryNodes() {
+  absl::MutexLock locker(&mutex_);
+  ++data_.num_trajectory_nodes;
+}
+
 void PoseGraph3D::AddTrajectoryIfNeeded(const int trajectory_id) {
   data_.trajectories_state[trajectory_id];
   CHECK(data_.trajectories_state.at(trajectory_id).state !=
@@ -247,7 +256,11 @@ void PoseGraph3D::AddLandmarkData(int trajectory_id,
 }
 
 void PoseGraph3D::ComputeConstraint(const NodeId& node_id,
-                                    const SubmapId& submap_id) {
+                                    const SubmapId& submap_id,
+                                    bool search_for_local_constraint /* false */,
+                                    bool search_for_global_constraint /* false */) {
+  CHECK(!(search_for_local_constraint && search_for_global_constraint));
+
   const transform::Rigid3d global_node_pose =
       optimization_problem_->node_data().at(node_id).global_pose;
 
@@ -272,10 +285,10 @@ void PoseGraph3D::ComputeConstraint(const NodeId& node_id,
         data_.trajectory_connectivity_state.LastConnectionTime(
             node_id.trajectory_id, submap_id.trajectory_id);
     if (node_id.trajectory_id == submap_id.trajectory_id ||
-        node_time <
-            last_connection_time +
-                common::FromSeconds(
-                    options_.global_constraint_search_after_n_seconds())) {
+        (node_time < last_connection_time +
+            common::FromSeconds(options_.global_constraint_search_after_n_seconds() &&
+            !search_for_global_constraint)) ||
+        search_for_local_constraint) {
       // If the node and the submap belong to the same trajectory or if there
       // has been a recent global constraint that ties that node's trajectory to
       // the submap's trajectory, it suffices to do a match constrained to a
@@ -572,7 +585,7 @@ void PoseGraph3D::DrainWorkQueue() {
       });
 }
 
-void PoseGraph3D::WaitForAllComputations() {
+void PoseGraph3D::WaitForAllComputations(bool quiet /* false */) {
   int num_trajectory_nodes;
   {
     absl::MutexLock locker(&mutex_);
@@ -583,9 +596,9 @@ void PoseGraph3D::WaitForAllComputations() {
       constraint_builder_.GetNumFinishedNodes();
 
   auto report_progress = [this, num_trajectory_nodes,
-                          num_finished_nodes_at_start]() {
+                          num_finished_nodes_at_start, quiet]() {
     // Log progress on nodes only when we are actually processing nodes.
-    if (num_trajectory_nodes != num_finished_nodes_at_start) {
+    if (num_trajectory_nodes != num_finished_nodes_at_start && !quiet) {
       std::ostringstream progress_info;
       progress_info << "Optimizing: " << std::fixed << std::setprecision(1)
                     << 100. *
@@ -632,7 +645,9 @@ void PoseGraph3D::WaitForAllComputations() {
     report_progress();
   }
   CHECK_EQ(constraint_builder_.GetNumFinishedNodes(), num_trajectory_nodes);
-  std::cout << "\r\x1b[KOptimizing: Done.     " << std::endl;
+  if (!quiet) {
+    std::cout << "\r\x1b[KOptimizing: Done.     " << std::endl;
+  }
 }
 
 void PoseGraph3D::DeleteTrajectory(const int trajectory_id) {
