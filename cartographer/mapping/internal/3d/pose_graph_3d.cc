@@ -289,10 +289,11 @@ void PoseGraph3D::ComputeConstraint(const NodeId& node_id,
             node_id.trajectory_id, submap_id.trajectory_id);
     const common::Duration global_constraint_search_after_n_seconds =
         common::FromSeconds(options_.global_constraint_search_after_n_seconds());
+    const bool recently_connected =
+        (last_connection_time + global_constraint_search_after_n_seconds > node_time);
     if (node_id.trajectory_id == submap_id.trajectory_id ||
         (connected &&
-          (global_constraint_search_after_n_seconds == common::Duration() ||
-            last_connection_time + global_constraint_search_after_n_seconds > node_time) &&
+          (global_constraint_search_after_n_seconds == common::Duration() || recently_connected) &&
           !search_for_global_constraint) ||
         search_for_local_constraint) {
       // If the node and the submap belong to the same trajectory or if there
