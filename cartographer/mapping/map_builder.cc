@@ -389,6 +389,10 @@ std::map<int, int> MapBuilder::LoadState(
     // submap.
     pose_graph_->AddSerializedConstraints(
         FromProto(pose_graph_proto.constraint()));
+    const auto& trajectory_states = pose_graph_->GetTrajectoryStates();
+    for (const auto& trajectory_id_state : trajectory_states) {
+      pose_graph_->FinishTrajectory(trajectory_id_state.first);
+    }
   }
   CHECK(reader->eof());
   return trajectory_remapping;
