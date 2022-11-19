@@ -87,8 +87,8 @@ class MapBuilderInterface {
   // be included in the serialized state.
   virtual void SerializeState(bool include_unfinished_submaps,
                               io::ProtoStreamWriterInterface* writer,
-                              const std::vector<mapping::proto::RosTrajectoryOptions>*
-                                  ros_trajectory_options = nullptr) = 0;
+                              const std::vector<mapping::proto::TrajectoryRosOptions>*
+                                  trajectory_ros_options = nullptr) = 0;
 
   // Serializes the current state to a proto stream file on the host system. If
   // 'include_unfinished_submaps' is set to true, unfinished submaps, i.e.
@@ -97,20 +97,20 @@ class MapBuilderInterface {
   // Returns true if the file was successfully written.
   virtual bool SerializeStateToFile(bool include_unfinished_submaps,
                                     const std::string& filename,
-                                    const std::vector<mapping::proto::RosTrajectoryOptions>*
-                                        ros_trajectory_options = nullptr) = 0;
+                                    const std::vector<mapping::proto::TrajectoryRosOptions>*
+                                        trajectory_ros_options = nullptr) = 0;
 
   // Loads the SLAM state from a proto stream. Returns the remapping of new
   // trajectory_ids.
   virtual std::map<int /* trajectory id in proto */, int /* trajectory id */>
   LoadState(io::ProtoStreamReaderInterface* reader, bool load_frozen_state,
-      std::vector<mapping::proto::RosTrajectoryOptions>* ros_trajectory_options = nullptr) = 0;
+      std::vector<mapping::proto::TrajectoryRosOptions>* trajectory_ros_options = nullptr) = 0;
 
   // Loads the SLAM state from a pbstream file. Returns the remapping of new
   // trajectory_ids.
   virtual std::map<int /* trajectory id in proto */, int /* trajectory id */>
   LoadStateFromFile(const std::string& filename, bool load_frozen_state,
-      std::vector<mapping::proto::RosTrajectoryOptions>* ros_trajectory_options = nullptr) = 0;
+      std::vector<mapping::proto::TrajectoryRosOptions>* trajectory_ros_options = nullptr) = 0;
 
   virtual int num_trajectory_builders() const = 0;
 

@@ -54,23 +54,23 @@ class MapBuilder : public MapBuilderInterface {
 
   void SerializeState(bool include_unfinished_submaps,
                       io::ProtoStreamWriterInterface *writer,
-                      const std::vector<mapping::proto::RosTrajectoryOptions>*
-                          ros_trajectory_options = nullptr) override;
+                      const std::vector<mapping::proto::TrajectoryRosOptions>*
+                          trajectory_ros_options = nullptr) override;
 
   bool SerializeStateToFile(bool include_unfinished_submaps,
                             const std::string &filename,
-                            const std::vector<mapping::proto::RosTrajectoryOptions>*
-                                ros_trajectory_options = nullptr) override;
+                            const std::vector<mapping::proto::TrajectoryRosOptions>*
+                                trajectory_ros_options = nullptr) override;
 
   std::map<int, int> LoadState(io::ProtoStreamReaderInterface *reader,
                                bool load_frozen_state,
-                               std::vector<mapping::proto::RosTrajectoryOptions>*
-                                  ros_trajectory_options = nullptr) override;
+                               std::vector<mapping::proto::TrajectoryRosOptions>*
+                                  trajectory_ros_options = nullptr) override;
 
   std::map<int, int> LoadStateFromFile(const std::string &filename,
                                        const bool load_frozen_state,
-                                       std::vector<mapping::proto::RosTrajectoryOptions>*
-                                          ros_trajectory_options = nullptr) override;
+                                       std::vector<mapping::proto::TrajectoryRosOptions>*
+                                          trajectory_ros_options = nullptr) override;
 
   mapping::PoseGraphInterface *pose_graph() override {
     return pose_graph_.get();

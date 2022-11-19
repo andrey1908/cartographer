@@ -209,11 +209,11 @@ void SerializeLandmarkNodes(
   }
 }
 
-void SerializeRosTrajectoryOptions(const std::vector<mapping::proto::RosTrajectoryOptions>&
-    ros_trajectory_options, ProtoStreamWriterInterface* const writer) {
-  for (const auto& entry : ros_trajectory_options) {
+void SerializeTrajectoryRosOptions(const std::vector<mapping::proto::TrajectoryRosOptions>&
+    trajectory_ros_options, ProtoStreamWriterInterface* const writer) {
+  for (const auto& entry : trajectory_ros_options) {
     SerializedData proto;
-    *proto.mutable_ros_trajectory_options() = entry;
+    *proto.mutable_trajectory_ros_options() = entry;
     writer->WriteProto(proto);
   }
 }
@@ -225,7 +225,7 @@ void WritePbStream(
     const std::vector<mapping::proto::TrajectoryBuilderOptionsWithSensorIds>&
         trajectory_builder_options,
     ProtoStreamWriterInterface* const writer, bool include_unfinished_submaps,
-    const std::vector<mapping::proto::RosTrajectoryOptions>* ros_trajectory_options /* nullptr */) {
+    const std::vector<mapping::proto::TrajectoryRosOptions>* trajectory_ros_options /* nullptr */) {
   writer->WriteProto(CreateHeader());
   writer->WriteProto(
       SerializePoseGraph(pose_graph, include_unfinished_submaps));
@@ -241,8 +241,8 @@ void WritePbStream(
   SerializeOdometryData(pose_graph.GetOdometryData(), writer);
   SerializeFixedFramePoseData(pose_graph.GetFixedFramePoseData(), writer);
   SerializeLandmarkNodes(pose_graph.GetLandmarkNodes(), writer);
-  if (ros_trajectory_options) {
-    SerializeRosTrajectoryOptions(*ros_trajectory_options, writer);
+  if (trajectory_ros_options) {
+    SerializeTrajectoryRosOptions(*trajectory_ros_options, writer);
   }
 }
 

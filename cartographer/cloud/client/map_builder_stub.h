@@ -50,20 +50,20 @@ class MapBuilderStub : public mapping::MapBuilderInterface {
       mapping::proto::SubmapQuery::Response* response) override;
   void SerializeState(bool include_unfinished_submaps,
                       io::ProtoStreamWriterInterface* writer,
-                      const std::vector<mapping::proto::RosTrajectoryOptions>*
-                          ros_trajectory_options = nullptr) override;
+                      const std::vector<mapping::proto::TrajectoryRosOptions>*
+                          trajectory_ros_options = nullptr) override;
   bool SerializeStateToFile(bool include_unfinished_submaps,
                             const std::string& filename,
-                            const std::vector<mapping::proto::RosTrajectoryOptions>*
-                                ros_trajectory_options = nullptr) override;
+                            const std::vector<mapping::proto::TrajectoryRosOptions>*
+                                trajectory_ros_options = nullptr) override;
   std::map<int, int> LoadState(io::ProtoStreamReaderInterface* reader,
                                bool load_frozen_state,
-                               std::vector<mapping::proto::RosTrajectoryOptions>*
-                                  ros_trajectory_options = nullptr) override;
+                               std::vector<mapping::proto::TrajectoryRosOptions>*
+                                  trajectory_ros_options = nullptr) override;
   std::map<int, int> LoadStateFromFile(const std::string& filename,
                                        bool load_frozen_state,
-                                       std::vector<mapping::proto::RosTrajectoryOptions>*
-                                          ros_trajectory_options = nullptr) override;
+                                       std::vector<mapping::proto::TrajectoryRosOptions>*
+                                          trajectory_ros_options = nullptr) override;
   int num_trajectory_builders() const override;
   mapping::PoseGraphInterface* pose_graph() override;
   const std::vector<mapping::proto::TrajectoryBuilderOptionsWithSensorIds>&
