@@ -485,7 +485,7 @@ void PoseGraph3D::TrimLoops() {
         global_submap_pose.inverse() * global_node_pose;
     const transform::Rigid3d error = relative_node_pose.inverse() * constraint.pose.zbar_ij;
     const double translation_error = error.translation().norm();
-    const double rotation_error = Eigen::AngleAxisd(error.rotation()).angle();
+    const double rotation_error = transform::GetAngle(error);
     if (translation_error <= loop_trimmer_options.max_translation_error_meters() &&
         rotation_error <= loop_trimmer_options.max_rotation_error_radians()) {
       fine_constraints.push_back(constraint);
