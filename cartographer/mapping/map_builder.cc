@@ -72,6 +72,15 @@ void MaybeAddPureLocalizationTrimmer(
   }
 }
 
+void MaybeAddLoopTrimmer(
+    const int trajectory_id,
+    const proto::TrajectoryBuilderOptions& trajectory_options,
+    PoseGraph* pose_graph) {
+  if (trajectory_options.has_loop_trimmer()) {
+    pose_graph->AddLoopTrimmer(trajectory_id, trajectory_options.loop_trimmer());
+  }
+}
+
 }  // namespace
 
 MapBuilder::MapBuilder(const proto::MapBuilderOptions& options, int num_range_data_2d /* 0 */, int num_range_data_3d /* 0 */)
@@ -145,6 +154,8 @@ int MapBuilder::AddTrajectoryBuilder(
   }
   MaybeAddPureLocalizationTrimmer(trajectory_id, trajectory_options,
                                   pose_graph_.get());
+  MaybeAddLoopTrimmer(trajectory_id, trajectory_options,
+                      pose_graph_.get());
 
   if (trajectory_options.has_initial_trajectory_pose()) {
     const auto& initial_trajectory_pose =

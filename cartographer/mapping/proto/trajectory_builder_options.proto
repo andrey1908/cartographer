@@ -16,6 +16,7 @@ syntax = "proto3";
 
 import "cartographer/transform/proto/transform.proto";
 import "cartographer/mapping/proto/motion_filter_options.proto";
+import "cartographer/mapping/proto/loop_trimmer_options.proto";
 import "cartographer/mapping/proto/local_trajectory_builder_options_2d.proto";
 import "cartographer/mapping/proto/local_trajectory_builder_options_3d.proto";
 
@@ -39,6 +40,8 @@ message TrajectoryBuilderOptions {
     int32 max_submaps_to_keep = 1;
   }
   PureLocalizationTrimmerOptions pure_localization_trimmer = 6;
+
+  LoopTrimmerOptions loop_trimmer = 11;
 
   bool collate_fixed_frame = 7;
   bool collate_landmarks = 8;

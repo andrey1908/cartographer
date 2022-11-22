@@ -113,6 +113,8 @@ class PoseGraph3D : public PoseGraph {
   void AddSerializedConstraints(
       const std::vector<Constraint>& constraints) override;
   void AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) override;
+  void AddLoopTrimmer(int trajectory_id,
+      const proto::LoopTrimmerOptions& loop_trimmer_options) override;
   void RunFinalOptimization() override;
   std::vector<std::vector<int>> GetConnectedTrajectories() const override
       LOCKS_EXCLUDED(mutex_);
@@ -221,6 +223,9 @@ class PoseGraph3D : public PoseGraph {
   void DrainWorkQueue() LOCKS_EXCLUDED(mutex_)
       LOCKS_EXCLUDED(work_queue_mutex_);
 
+  // Trim close and false detected loops after optimization.
+  void TrimLoops() LOCKS_EXCLUDED(mutex_);
+
   // Runs the optimization. Callers have to make sure, that there is only one
   // optimization being run at a time.
   void RunOptimization() LOCKS_EXCLUDED(mutex_);
@@ -274,6 +279,7 @@ class PoseGraph3D : public PoseGraph {
 
   // List of all trimmers to consult when optimizations finish.
   std::vector<std::unique_ptr<PoseGraphTrimmer>> trimmers_ GUARDED_BY(mutex_);
+  std::map<int, proto::LoopTrimmerOptions> loop_trimmer_options_ GUARDED_BY(mutex_);
 
   PoseGraphData data_ GUARDED_BY(mutex_);
 

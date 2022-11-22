@@ -90,6 +90,7 @@ POSE_GRAPH = {
   global_sampling_ratio = 0.003,
   log_work_queue_size = false,
   log_residual_histograms = true,
+  log_number_of_trimmed_loops = false,
   global_constraint_search_after_n_seconds = 10.,
   --  overlapping_submaps_trimmer_2d = {
   --    fresh_submaps_count = 1,

@@ -54,6 +54,8 @@ message PoseGraphOptions {
   // Whether to output histograms for the pose residuals.
   bool log_residual_histograms = 9;
 
+  bool log_number_of_trimmed_loops = 13;
+
   // If for the duration specified by this option no global contraint has been
   // added between two trajectories, loop closure searches will be performed
   // globally rather than in a smaller search window.

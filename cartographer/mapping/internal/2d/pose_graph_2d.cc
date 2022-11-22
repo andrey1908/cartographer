@@ -880,6 +880,11 @@ void PoseGraph2D::AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) {
   });
 }
 
+void PoseGraph2D::AddLoopTrimmer(int trajectory_id,
+    const proto::LoopTrimmerOptions& loop_trimmer_options) {
+  CHECK(false) << "Not implemented";
+}
+
 void PoseGraph2D::RunFinalOptimization() {
   {
     AddWorkItem([this]() LOCKS_EXCLUDED(mutex_) {

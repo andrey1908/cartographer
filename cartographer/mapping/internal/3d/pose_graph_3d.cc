@@ -448,6 +448,139 @@ void PoseGraph3D::DeleteTrajectoriesIfNeeded() {
   }
 }
 
+void PoseGraph3D::TrimLoops() {
+  MEASURE_BLOCK_TIME(trim_loops);
+  absl::MutexLock locker(&mutex_);
+
+  int num_false_detected_trimmed = 0;
+  std::vector<PoseGraphInterface::Constraint> fine_constraints;
+  fine_constraints.reserve(data_.constraints.size());
+  for (const auto& constraint : data_.constraints) {
+    if (constraint.tag == Constraint::INTRA_SUBMAP) {
+      fine_constraints.push_back(constraint);
+      continue;
+    }
+    if (loop_trimmer_options_.count(constraint.submap_id.trajectory_id) == 0 &&
+        loop_trimmer_options_.count(constraint.node_id.trajectory_id) == 0) {
+      fine_constraints.push_back(constraint);
+      continue;
+    }
+    int loop_trimmer_trajectory_id;
+    if (loop_trimmer_options_.count(constraint.submap_id.trajectory_id)) {
+      loop_trimmer_trajectory_id = constraint.submap_id.trajectory_id;
+    } else {
+      loop_trimmer_trajectory_id = constraint.node_id.trajectory_id;
+    }
+    const proto::LoopTrimmerOptions& loop_trimmer_options =
+        loop_trimmer_options_.at(loop_trimmer_trajectory_id);
+    if (!loop_trimmer_options.trim_false_detected_loops()) {
+      fine_constraints.push_back(constraint);
+      continue;
+    }
+    const transform::Rigid3d& global_submap_pose =
+        data_.global_submap_poses_3d.at(constraint.submap_id).global_pose;
+    const transform::Rigid3d& global_node_pose =
+        data_.trajectory_nodes.at(constraint.node_id).global_pose;
+    const transform::Rigid3d relative_node_pose =
+        global_submap_pose.inverse() * global_node_pose;
+    const transform::Rigid3d error = relative_node_pose.inverse() * constraint.pose.zbar_ij;
+    const double translation_error = error.translation().norm();
+    const double rotation_error = Eigen::AngleAxisd(error.rotation()).angle();
+    if (translation_error <= loop_trimmer_options.max_translation_error_meters() &&
+        rotation_error <= loop_trimmer_options.max_rotation_error_radians()) {
+      fine_constraints.push_back(constraint);
+    } else {
+      num_false_detected_trimmed++;
+    }
+  }
+  data_.constraints = std::move(fine_constraints);
+
+  int num_before = 0;
+  MapById<SubmapId, MapById<NodeId, float>> sorted_loops;
+  for (const auto& constraint : data_.constraints) {
+    if (constraint.tag == Constraint::INTRA_SUBMAP) {
+      continue;
+    }
+    num_before++;
+    if (loop_trimmer_options_.count(constraint.submap_id.trajectory_id) == 0 &&
+        loop_trimmer_options_.count(constraint.node_id.trajectory_id) == 0) {
+      continue;
+    }
+    if (!sorted_loops.Contains(constraint.submap_id)) {
+      sorted_loops.Insert(constraint.submap_id, {});
+    }
+    sorted_loops.at(constraint.submap_id).Insert(constraint.node_id, constraint.score);
+  }
+
+  std::set<std::pair<SubmapId, NodeId>> loops_to_remove;
+  std::map<std::pair<int, int>, std::pair<SubmapId, NodeId>> last_loop_per_trajectory;
+  for (const auto& entry : sorted_loops) {
+    const SubmapId& submap_id = entry.id;
+    const auto& connected_nodes = entry.data;
+    for (int trajectory_id : connected_nodes.trajectory_ids()) {
+      int loop_trimmer_trajectory_id;
+      if (loop_trimmer_options_.count(submap_id.trajectory_id)) {
+        loop_trimmer_trajectory_id = submap_id.trajectory_id;
+      } else {
+        loop_trimmer_trajectory_id = trajectory_id;
+      }
+      const proto::LoopTrimmerOptions& loop_trimmer_options =
+          loop_trimmer_options_.at(loop_trimmer_trajectory_id);
+      if (!loop_trimmer_options.trim_loops_in_window()) {
+        continue;
+      }
+      last_loop_per_trajectory.emplace(std::make_pair(submap_id.trajectory_id, trajectory_id),
+          std::make_pair(SubmapId(-1, -1), NodeId(-1, -1)));
+      int window_first_node_index =
+          connected_nodes.BeginOfTrajectory(trajectory_id)->id.node_index;
+      NodeId node_id_to_retain(-1, -1);
+      float max_score = std::numeric_limits<float>::min();
+      for (const auto& connected_node : connected_nodes.trajectory(trajectory_id)) {
+        const NodeId& node_id = connected_node.id;
+        float score = connected_node.data;
+        if (node_id.node_index >= window_first_node_index + loop_trimmer_options.window_size()) {
+          loops_to_remove.erase(std::make_pair(submap_id, node_id_to_retain));
+          window_first_node_index = node_id.node_index;
+          max_score = std::numeric_limits<float>::min();
+        }
+        if (score > max_score) {
+          node_id_to_retain = node_id;
+          max_score = score;
+        }
+        loops_to_remove.emplace(submap_id, node_id);
+      }
+      loops_to_remove.erase(std::make_pair(submap_id, node_id_to_retain));
+      const NodeId& last_node_id = std::prev(connected_nodes.EndOfTrajectory(trajectory_id))->id;
+      if (last_node_id.node_index >
+          last_loop_per_trajectory.at(std::make_pair(submap_id.trajectory_id, trajectory_id)).second.node_index) {
+        last_loop_per_trajectory.at(std::make_pair(submap_id.trajectory_id, trajectory_id)) = std::make_pair(submap_id, last_node_id);
+      }
+    }
+  }
+  for (const auto& entry : last_loop_per_trajectory) {
+    loops_to_remove.erase(entry.second);
+  }
+
+  int num_after = 0;
+  std::vector<PoseGraphInterface::Constraint> trimmed_constraints;
+  trimmed_constraints.reserve(data_.constraints.size());
+  for (const auto& constraint : data_.constraints) {
+    if (constraint.tag == Constraint::INTRA_SUBMAP) {
+      trimmed_constraints.push_back(constraint);
+    } else if (loops_to_remove.count(std::make_pair(constraint.submap_id, constraint.node_id)) == 0) {
+      trimmed_constraints.push_back(constraint);
+      num_after++;
+    }
+  }
+  data_.constraints = std::move(trimmed_constraints);
+
+  if (options_.log_number_of_trimmed_loops()) {
+    LOG(INFO) << "Trimmed " << num_false_detected_trimmed << " false detected loops";
+    LOG(INFO) << "Trimmed " << num_before - num_after <<
+        " (" << num_before << " -> " << num_after << ") using search window";
+  }
+}
+
 void PoseGraph3D::HandleWorkQueue(
     const constraints::ConstraintBuilder3D::Result& result) {
   {
@@ -457,13 +590,11 @@ void PoseGraph3D::HandleWorkQueue(
                              result.end());
   }
 
-  // LOG(INFO) << "Optimizing...";
-
   MEASURE_TIME_FROM_HERE(optimization);
   RunOptimization();
   STOP_TIME_MEASUREMENT(optimization);
 
-  // LOG(INFO) << "Optimization is done!";
+  TrimLoops();
 
   {
     absl::MutexLock locker(&mutex_);
@@ -868,6 +999,15 @@ void PoseGraph3D::AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) {
   AddWorkItem([this, trimmer_ptr]() LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock locker(&mutex_);
     trimmers_.emplace_back(trimmer_ptr);
+    return WorkItem::Result::kDoNotRunOptimization;
+  });
+}
+
+void PoseGraph3D::AddLoopTrimmer(int trajectory_id,
+    const proto::LoopTrimmerOptions& loop_trimmer_options) {
+  AddWorkItem([this, trajectory_id, loop_trimmer_options]() LOCKS_EXCLUDED(mutex_) {
+    absl::MutexLock locker(&mutex_);
+    loop_trimmer_options_.emplace(trajectory_id, loop_trimmer_options);
     return WorkItem::Result::kDoNotRunOptimization;
   });
 }

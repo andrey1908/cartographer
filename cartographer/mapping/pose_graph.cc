@@ -109,6 +109,8 @@ proto::PoseGraphOptions CreatePoseGraphOptions(
       parameter_dictionary->GetBool("log_work_queue_size"));
   options.set_log_residual_histograms(
       parameter_dictionary->GetBool("log_residual_histograms"));
+  options.set_log_number_of_trimmed_loops(
+      parameter_dictionary->GetBool("log_number_of_trimmed_loops"));
   options.set_global_constraint_search_after_n_seconds(
       parameter_dictionary->GetDouble(
           "global_constraint_search_after_n_seconds"));

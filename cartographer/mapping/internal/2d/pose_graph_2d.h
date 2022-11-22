@@ -115,6 +115,8 @@ class PoseGraph2D : public PoseGraph {
   void AddSerializedConstraints(
       const std::vector<Constraint>& constraints) override;
   void AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) override;
+  void AddLoopTrimmer(int trajectory_id,
+      const proto::LoopTrimmerOptions& loop_trimmer_options) override;
   void RunFinalOptimization() override;
   std::vector<std::vector<int>> GetConnectedTrajectories() const override
       LOCKS_EXCLUDED(mutex_);

@@ -109,6 +109,10 @@ class PoseGraph : public PoseGraphInterface {
   // included in the pose graph.
   virtual void AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) = 0;
 
+  // Adds a loop trimmer to remove loops after optimization.
+  virtual void AddLoopTrimmer(int trajectory_id,
+      const proto::LoopTrimmerOptions& loop_trimmer_options) = 0;
+
   // Gets the current trajectory clusters.
   virtual std::vector<std::vector<int>> GetConnectedTrajectories() const = 0;
 

@@ -296,7 +296,7 @@ void ConstraintBuilder3D::ComputeConstraint(
       node_id,
       {constraint_transform, options_.loop_closure_translation_weight(),
        options_.loop_closure_rotation_weight()},
-      Constraint::INTER_SUBMAP});
+      Constraint::INTER_SUBMAP, match_result->score});
 
   if (options_.log_constraints()) {
     std::ostringstream info;

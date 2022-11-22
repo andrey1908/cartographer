@@ -37,6 +37,27 @@ void PopulatePureLocalizationTrimmerOptions(
       options_dictionary->GetInt("max_submaps_to_keep"));
 }
 
+void PopulateLoopTrimmerOptions(
+    proto::TrajectoryBuilderOptions* const trajectory_builder_options,
+    common::LuaParameterDictionary* const parameter_dictionary) {
+  constexpr char kDictionaryKey[] = "loop_trimmer";
+  if (!parameter_dictionary->HasKey(kDictionaryKey)) return;
+
+  auto options_dictionary = parameter_dictionary->GetDictionary(kDictionaryKey);
+  auto* options =
+      trajectory_builder_options->mutable_loop_trimmer();
+  options->set_trim_false_detected_loops(
+      options_dictionary->GetBool("trim_false_detected_loops"));
+  options->set_max_translation_error_meters(
+      options_dictionary->GetDouble("max_translation_error_meters"));
+  options->set_max_rotation_error_radians(
+      options_dictionary->GetDouble("max_rotation_error_radians"));
+  options->set_trim_loops_in_window(
+      options_dictionary->GetBool("trim_loops_in_window"));
+  options->set_window_size(
+      options_dictionary->GetInt("window_size"));
+}
+
 void PopulatePoseGraphOdometryMotionFilterOptions(
     proto::TrajectoryBuilderOptions* const trajectory_builder_options,
     common::LuaParameterDictionary* const parameter_dictionary) {
@@ -75,6 +96,7 @@ proto::TrajectoryBuilderOptions CreateTrajectoryBuilderOptions(
       parameter_dictionary->GetBool("log_data_frequency"));
   PopulatePureLocalizationTrimmerOptions(&options, parameter_dictionary);
   PopulatePoseGraphOdometryMotionFilterOptions(&options, parameter_dictionary);
+  PopulateLoopTrimmerOptions(&options, parameter_dictionary);
   return options;
 }
 
