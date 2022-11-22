@@ -223,6 +223,10 @@ class PoseGraph3D : public PoseGraph {
   void DrainWorkQueue() LOCKS_EXCLUDED(mutex_)
       LOCKS_EXCLUDED(work_queue_mutex_);
 
+  double ComputeTrajectoryLength(const NodeId& from, const NodeId& to);
+  std::vector<PoseGraphInterface::Constraint>
+      TrimFalseDetectedLoops(const std::vector<PoseGraphInterface::Constraint>& result);
+
   // Trim close and false detected loops after optimization.
   void TrimLoops() LOCKS_EXCLUDED(mutex_);
 
