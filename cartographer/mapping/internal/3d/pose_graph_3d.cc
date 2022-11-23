@@ -717,6 +717,10 @@ void PoseGraph3D::HandleWorkQueue(
   RunOptimization();
   STOP_TIME_MEASUREMENT(optimization);
 
+  if (loop_trimmer_options_.size()) {
+    TrimLoops();
+  }
+
   {
     absl::MutexLock locker(&mutex_);
     for (const Constraint& constraint : result) {
