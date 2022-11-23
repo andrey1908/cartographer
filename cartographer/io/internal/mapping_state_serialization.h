@@ -25,7 +25,8 @@ namespace cartographer {
 namespace io {
 
 // The current serialization format version.
-static constexpr int kMappingStateSerializationFormatVersion = 2;
+static constexpr int kMappingStateSerializationFormatVersion = 3;
+static constexpr int kFormatVersionWithoutTravelledDistance = 2;
 static constexpr int kFormatVersionWithoutSubmapHistograms = 1;
 
 // Serialize mapping state to a pbstream.

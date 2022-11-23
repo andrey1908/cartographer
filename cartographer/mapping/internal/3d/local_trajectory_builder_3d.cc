@@ -57,7 +57,8 @@ LocalTrajectoryBuilder3D::LocalTrajectoryBuilder3D(
               options_.real_time_correlative_scan_matcher_options())),
       ceres_scan_matcher_(absl::make_unique<scan_matching::CeresScanMatcher3D>(
           options_.ceres_scan_matcher_options())),
-      range_data_collator_(expected_range_sensor_ids) {}
+      range_data_collator_(expected_range_sensor_ids),
+      travelled_distance_(0.) {}
 
 LocalTrajectoryBuilder3D::~LocalTrajectoryBuilder3D() {}
 
@@ -66,6 +67,7 @@ std::unique_ptr<transform::Rigid3d> LocalTrajectoryBuilder3D::ScanMatch(
     const sensor::PointCloud& low_resolution_point_cloud_in_tracking,
     const sensor::PointCloud& high_resolution_point_cloud_in_tracking) {
   if (active_submaps_.submaps().empty()) {
+    last_pose_estimate_ = pose_prediction;
     return absl::make_unique<transform::Rigid3d>(pose_prediction);
   }
   std::shared_ptr<const mapping::Submap3D> matching_submap =
@@ -328,6 +330,9 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
   }
   extrapolator_->AddPose(time, *pose_estimate);
 
+  travelled_distance_ += (pose_estimate->translation() - last_pose_estimate_.translation()).norm();
+  last_pose_estimate_ = *pose_estimate;
+
   const auto scan_matcher_stop = std::chrono::steady_clock::now();
   const auto scan_matcher_duration = scan_matcher_stop - scan_matcher_start;
   if (sensor_duration.has_value()) {
@@ -442,7 +447,8 @@ LocalTrajectoryBuilder3D::InsertIntoSubmap(
                               high_resolution_point_cloud_in_tracking,
                               low_resolution_point_cloud_in_tracking,
                               rotational_scan_matcher_histogram_in_gravity,
-                              pose_estimate}),
+                              pose_estimate,
+                              travelled_distance_}),
                       std::move(insertion_submaps)});
 }
 

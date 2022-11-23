@@ -121,6 +121,9 @@ class LocalTrajectoryBuilder3D {
   RangeDataCollator range_data_collator_;
 
   absl::optional<common::Time> last_sensor_time_;
+
+  transform::Rigid3d last_pose_estimate_;
+  double travelled_distance_;
 };
 
 }  // namespace mapping
