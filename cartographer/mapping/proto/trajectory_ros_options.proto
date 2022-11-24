@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package cartographer.mapping.proto;
+
+message TrajectoryRosOptions {
+  int32 trajectory_id = 1;
+  string tracking_frame = 2;
+}

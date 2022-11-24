@@ -21,6 +21,7 @@ import "cartographer/mapping/proto/submap.proto";
 import "cartographer/mapping/proto/trajectory_node_data.proto";
 import "cartographer/sensor/proto/sensor.proto";
 import "cartographer/mapping/proto/trajectory_builder_options.proto";
+import "cartographer/mapping/proto/trajectory_ros_options.proto";
 import "cartographer/transform/proto/transform.proto";
 
 message Submap {
@@ -73,15 +74,11 @@ message SerializationHeader {
   uint32 format_version = 1;
 }
 
-message TrajectoryRosOptions {
-  int32 trajectory_id = 1;
-  string tracking_frame = 2;
-}
-
 message SerializedData {
   oneof data {
     PoseGraph pose_graph = 1;
     AllTrajectoryBuilderOptions all_trajectory_builder_options = 2;
+
     Submap submap = 3;
     Node node = 4;
     TrajectoryData trajectory_data = 5;
