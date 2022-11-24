@@ -369,6 +369,8 @@ std::map<int, int> MapBuilder::LoadState(
       }
       case SerializedData::kTrajectoryRosOptions: {
         if (trajectory_ros_options) {
+          proto.mutable_trajectory_ros_options()->set_trajectory_id(
+              trajectory_remapping.at(proto.trajectory_ros_options().trajectory_id()));
           trajectory_ros_options->push_back(proto.trajectory_ros_options());
         }
         break;
