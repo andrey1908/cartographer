@@ -242,14 +242,12 @@ std::map<int, int> MapBuilder::LoadState(
   std::map<int, int> trajectory_remapping;
   for (int i = 0; i < pose_graph_proto.trajectory_size(); ++i) {
     auto& trajectory_proto = *pose_graph_proto.mutable_trajectory(i);
+    CHECK_EQ(trajectory_proto.trajectory_id(), i);
     const auto& options_with_sensor_ids_proto =
         all_builder_options_proto.options_with_sensor_ids(i);
     const int new_trajectory_id =
         AddTrajectoryForDeserialization(options_with_sensor_ids_proto);
-    CHECK(trajectory_remapping
-              .emplace(trajectory_proto.trajectory_id(), new_trajectory_id)
-              .second)
-        << "Duplicate trajectory ID: " << trajectory_proto.trajectory_id();
+    trajectory_remapping.emplace(trajectory_proto.trajectory_id(), new_trajectory_id);
     trajectory_proto.set_trajectory_id(new_trajectory_id);
     if (load_frozen_state) {
       pose_graph_->FreezeTrajectory(new_trajectory_id);
@@ -265,19 +263,16 @@ std::map<int, int> MapBuilder::LoadState(
   }
 
   MapById<SubmapId, transform::Rigid3d> submap_poses;
-  for (const proto::Trajectory& trajectory_proto :
-       pose_graph_proto.trajectory()) {
-    for (const proto::Trajectory::Submap& submap_proto :
-         trajectory_proto.submap()) {
-      submap_poses.Insert(SubmapId{trajectory_proto.trajectory_id(),
-                                   submap_proto.submap_index()},
-                          transform::ToRigid3(submap_proto.pose()));
+  for (const proto::Trajectory& trajectory_proto : pose_graph_proto.trajectory()) {
+    for (const proto::Trajectory::Submap& submap_proto : trajectory_proto.submap()) {
+      submap_poses.Insert(
+          SubmapId{trajectory_proto.trajectory_id(), submap_proto.submap_index()},
+          transform::ToRigid3(submap_proto.pose()));
     }
   }
 
   MapById<NodeId, transform::Rigid3d> node_poses;
-  for (const proto::Trajectory& trajectory_proto :
-       pose_graph_proto.trajectory()) {
+  for (const proto::Trajectory& trajectory_proto : pose_graph_proto.trajectory()) {
     for (const proto::Trajectory::Node& node_proto : trajectory_proto.node()) {
       node_poses.Insert(
           NodeId{trajectory_proto.trajectory_id(), node_proto.node_index()},
@@ -288,17 +283,14 @@ std::map<int, int> MapBuilder::LoadState(
   // Set global poses of landmarks.
   for (const auto& landmark : pose_graph_proto.landmark_poses()) {
     pose_graph_->SetLandmarkPose(landmark.landmark_id(),
-                                 transform::ToRigid3(landmark.global_pose()),
-                                 true);
+        transform::ToRigid3(landmark.global_pose()), true);
   }
 
-  if (options_.use_trajectory_builder_3d()) {
-    CHECK_NE(deserializer.header().format_version(),
-             io::kFormatVersionWithoutSubmapHistograms)
-        << "The pbstream file contains submaps without rotational histograms. "
-           "This can be converted with the 'pbstream migrate' tool, see the "
-           "Cartographer documentation for details. ";
-  }
+  CHECK_EQ(deserializer.header().format_version(),
+           io::kMappingStateSerializationFormatVersion)
+      << "The pbstream file is out of date. "
+         "This can be converted with the 'pbstream migrate' tool, see the "
+         "Cartographer documentation for details.";
 
   SerializedData proto;
   while (deserializer.ReadNextSerializedData(&proto)) {
@@ -314,12 +306,11 @@ std::map<int, int> MapBuilder::LoadState(
         break;
       case SerializedData::kSubmap: {
         proto.mutable_submap()->mutable_submap_id()->set_trajectory_id(
-            trajectory_remapping.at(
-                proto.submap().submap_id().trajectory_id()));
+            trajectory_remapping.at(proto.submap().submap_id().trajectory_id()));
         const SubmapId submap_id(proto.submap().submap_id().trajectory_id(),
                                  proto.submap().submap_id().submap_index());
-        pose_graph_->AddSubmapFromProto(submap_poses.at(submap_id),
-                                        proto.submap());
+        const transform::Rigid3d& submap_pose = submap_poses.at(submap_id);
+        pose_graph_->AddSubmapFromProto(submap_pose, proto.submap());
         break;
       }
       case SerializedData::kNode: {
@@ -354,10 +345,8 @@ std::map<int, int> MapBuilder::LoadState(
       case SerializedData::kFixedFramePoseData: {
         if (load_frozen_state) break;
         pose_graph_->AddFixedFramePoseData(
-            trajectory_remapping.at(
-                proto.fixed_frame_pose_data().trajectory_id()),
-            sensor::FromProto(
-                proto.fixed_frame_pose_data().fixed_frame_pose_data()));
+            trajectory_remapping.at(proto.fixed_frame_pose_data().trajectory_id()),
+            sensor::FromProto(proto.fixed_frame_pose_data().fixed_frame_pose_data()));
         break;
       }
       case SerializedData::kLandmarkData: {

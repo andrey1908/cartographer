@@ -43,9 +43,7 @@ int pbstream_migrate(int argc, char** argv) {
   }
   cartographer::io::ProtoStreamReader input(argv[2]);
   cartographer::io::ProtoStreamWriter output(argv[3]);
-  LOG(INFO) << "Migrating serialization format 1 in \"" << argv[2]
-            << "\" to serialization format 2 in \"" << argv[3] << "\"";
-  cartographer::io::MigrateStreamVersion1ToVersion2(
+  cartographer::io::MigrateStreamVersion(
       &input, &output, FLAGS_include_unfinished_submaps);
   CHECK(output.Close()) << "Could not write migrated pbstream file to: "
                         << argv[3];

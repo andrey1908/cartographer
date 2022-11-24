@@ -24,10 +24,7 @@
 namespace cartographer {
 namespace io {
 
-// This helper function migrates the input stream, which is supposed
-// to contain submaps without histograms (stream format version 1) to
-// an output stream containing submaps with histograms (version 2).
-void MigrateStreamVersion1ToVersion2(
+void MigrateStreamVersion(
     cartographer::io::ProtoStreamReaderInterface* const input,
     cartographer::io::ProtoStreamWriterInterface* const output,
     bool include_unfinished_submaps);
