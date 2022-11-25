@@ -48,14 +48,12 @@ void PopulateLoopTrimmerOptions(
       trajectory_builder_options->mutable_loop_trimmer();
   options->set_trim_false_detected_loops(
       options_dictionary->GetBool("trim_false_detected_loops"));
-  options->set_max_translation_error_meters(
-      options_dictionary->GetDouble("max_translation_error_meters"));
-  options->set_max_rotation_error_radians(
-      options_dictionary->GetDouble("max_rotation_error_radians"));
+  options->set_max_translation_error_travelled_distance_ratio(
+      options_dictionary->GetDouble("max_translation_error_travelled_distance_ratio"));
   options->set_trim_loops_in_window(
       options_dictionary->GetBool("trim_loops_in_window"));
-  options->set_window_size(
-      options_dictionary->GetInt("window_size"));
+  options->set_window_size_per_submap(
+      options_dictionary->GetInt("window_size_per_submap"));
 }
 
 void PopulatePoseGraphOdometryMotionFilterOptions(

@@ -448,53 +448,118 @@ void PoseGraph3D::DeleteTrajectoriesIfNeeded() {
   }
 }
 
-void PoseGraph3D::TrimLoops() {
-  MEASURE_BLOCK_TIME(trim_loops);
+std::vector<PoseGraphInterface::Constraint>
+PoseGraph3D::TrimFalseDetectedLoops(const std::vector<PoseGraphInterface::Constraint>& new_loops) {
+  MEASURE_BLOCK_TIME(trim_false_detected_loops);
   absl::MutexLock locker(&mutex_);
 
-  int num_false_detected_trimmed = 0;
-  std::vector<PoseGraphInterface::Constraint> fine_constraints;
-  fine_constraints.reserve(data_.constraints.size());
-  for (const auto& constraint : data_.constraints) {
-    if (constraint.tag == Constraint::INTRA_SUBMAP) {
-      fine_constraints.push_back(constraint);
-      continue;
-    }
-    if (loop_trimmer_options_.count(constraint.submap_id.trajectory_id) == 0 &&
-        loop_trimmer_options_.count(constraint.node_id.trajectory_id) == 0) {
-      fine_constraints.push_back(constraint);
-      continue;
-    }
+  int num_before = new_loops.size();
+  std::vector<PoseGraphInterface::Constraint> true_detected_loops;
+  true_detected_loops.reserve(new_loops.size());
+  for (const auto& new_loop : new_loops) {
     int loop_trimmer_trajectory_id;
-    if (loop_trimmer_options_.count(constraint.submap_id.trajectory_id)) {
-      loop_trimmer_trajectory_id = constraint.submap_id.trajectory_id;
+    if (loop_trimmer_options_.count(new_loop.submap_id.trajectory_id)) {
+      loop_trimmer_trajectory_id = new_loop.submap_id.trajectory_id;
     } else {
-      loop_trimmer_trajectory_id = constraint.node_id.trajectory_id;
+      if (loop_trimmer_options_.count(new_loop.node_id.trajectory_id)) {
+        loop_trimmer_trajectory_id = new_loop.node_id.trajectory_id; 
+      } else {
+        true_detected_loops.push_back(new_loop);
+        continue;
+      }
     }
     const proto::LoopTrimmerOptions& loop_trimmer_options =
         loop_trimmer_options_.at(loop_trimmer_trajectory_id);
     if (!loop_trimmer_options.trim_false_detected_loops()) {
-      fine_constraints.push_back(constraint);
+      true_detected_loops.push_back(new_loop);
       continue;
     }
+    bool different_trajectories =
+        (new_loop.submap_id.trajectory_id != new_loop.node_id.trajectory_id);
+    const NodeId& new_loop_first_node_id_in_submap =
+        *data_.submap_data.at(new_loop.submap_id).node_ids.begin();
+    const NodeId& new_loop_node_id = new_loop.node_id;
+    double travelled_distance;
+    if (different_trajectories) {
+      travelled_distance = std::numeric_limits<double>::max();
+    } else {
+      travelled_distance = std::abs(
+          data_.trajectory_nodes.at(new_loop_first_node_id_in_submap).constant_data->travelled_distance -
+          data_.trajectory_nodes.at(new_loop_node_id).constant_data->travelled_distance);
+    }
+    for (const auto& loop : data_.constraints) {
+      if (loop.tag == Constraint::INTRA_SUBMAP) {
+        continue;
+      }
+      if (loop.score <= new_loop.score) {
+        continue;
+      }
+      const NodeId& loop_first_node_id_in_submap =
+          *data_.submap_data.at(loop.submap_id).node_ids.begin();
+      const NodeId& loop_node_id = loop.node_id;
+      bool crossed;
+      if (new_loop_first_node_id_in_submap.trajectory_id == loop_first_node_id_in_submap.trajectory_id &&
+          new_loop_node_id.trajectory_id == loop_node_id.trajectory_id) {
+        if (!different_trajectories) {
+          if ((new_loop_first_node_id_in_submap.node_index < new_loop_node_id.node_index) ==
+              (loop_first_node_id_in_submap.node_index < loop_node_id.node_index)) {
+            crossed = false;
+          } else {
+            crossed = true;
+          }
+        } else {
+          crossed = false;
+        }
+      } else if (new_loop_first_node_id_in_submap.trajectory_id == loop_node_id.trajectory_id &&
+                 new_loop_node_id.trajectory_id == loop_first_node_id_in_submap.trajectory_id) {
+        crossed = true;
+      } else {
+        continue;
+      }
+      double travelled_distance_with_loop;
+      if (crossed) {
+        travelled_distance_with_loop =
+        std::abs(
+            data_.trajectory_nodes.at(new_loop_first_node_id_in_submap).constant_data->travelled_distance -
+            data_.trajectory_nodes.at(loop_node_id).constant_data->travelled_distance) +
+        std::abs(
+            data_.trajectory_nodes.at(new_loop_node_id).constant_data->travelled_distance -
+            data_.trajectory_nodes.at(loop_first_node_id_in_submap).constant_data->travelled_distance);
+      } else {
+        travelled_distance_with_loop =
+        std::abs(
+            data_.trajectory_nodes.at(new_loop_first_node_id_in_submap).constant_data->travelled_distance -
+            data_.trajectory_nodes.at(loop_first_node_id_in_submap).constant_data->travelled_distance) +
+        std::abs(
+            data_.trajectory_nodes.at(new_loop_node_id).constant_data->travelled_distance -
+            data_.trajectory_nodes.at(loop_node_id).constant_data->travelled_distance);
+      }
+      travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
+    }
     const transform::Rigid3d& global_submap_pose =
-        data_.global_submap_poses_3d.at(constraint.submap_id).global_pose;
+        data_.global_submap_poses_3d.at(new_loop.submap_id).global_pose;
     const transform::Rigid3d& global_node_pose =
-        data_.trajectory_nodes.at(constraint.node_id).global_pose;
+        data_.trajectory_nodes.at(new_loop.node_id).global_pose;
     const transform::Rigid3d relative_node_pose =
         global_submap_pose.inverse() * global_node_pose;
-    const transform::Rigid3d error = relative_node_pose.inverse() * constraint.pose.zbar_ij;
-    const double translation_error = error.translation().norm();
-    const double rotation_error = transform::GetAngle(error);
-    if (translation_error <= loop_trimmer_options.max_translation_error_meters() &&
-        rotation_error <= loop_trimmer_options.max_rotation_error_radians()) {
-      fine_constraints.push_back(constraint);
-    } else {
-      num_false_detected_trimmed++;
+    const double translation_error =
+        (new_loop.pose.zbar_ij.translation() - relative_node_pose.translation()).norm();
+    if (translation_error / travelled_distance <
+        loop_trimmer_options.max_translation_error_travelled_distance_ratio()) {
+      true_detected_loops.push_back(new_loop);
     }
   }
-  data_.constraints = std::move(fine_constraints);
+  int num_after = true_detected_loops.size();
+  if (options_.log_number_of_trimmed_loops()) {
+    LOG(INFO) << "Trimmed " << num_before - num_after <<
+        " (" << num_before << " -> " << num_after << ") false detected loops";
+  }
+  return true_detected_loops;
+}
 
+void PoseGraph3D::TrimLoopsInWindow() {
+  MEASURE_BLOCK_TIME(trim_loops_in_window);
+  absl::MutexLock locker(&mutex_);
   int num_before = 0;
   MapById<SubmapId, MapById<NodeId, float>> sorted_loops;
   for (const auto& constraint : data_.constraints) {
@@ -513,7 +578,6 @@ void PoseGraph3D::TrimLoops() {
   }
 
   std::set<std::pair<SubmapId, NodeId>> loops_to_remove;
-  std::map<std::pair<int, int>, std::pair<SubmapId, NodeId>> last_loop_per_trajectory;
   for (const auto& entry : sorted_loops) {
     const SubmapId& submap_id = entry.id;
     const auto& connected_nodes = entry.data;
@@ -529,8 +593,6 @@ void PoseGraph3D::TrimLoops() {
       if (!loop_trimmer_options.trim_loops_in_window()) {
         continue;
       }
-      last_loop_per_trajectory.emplace(std::make_pair(submap_id.trajectory_id, trajectory_id),
-          std::make_pair(SubmapId(-1, -1), NodeId(-1, -1)));
       int window_first_node_index =
           connected_nodes.BeginOfTrajectory(trajectory_id)->id.node_index;
       NodeId node_id_to_retain(-1, -1);
@@ -538,7 +600,7 @@ void PoseGraph3D::TrimLoops() {
       for (const auto& connected_node : connected_nodes.trajectory(trajectory_id)) {
         const NodeId& node_id = connected_node.id;
         float score = connected_node.data;
-        if (node_id.node_index >= window_first_node_index + loop_trimmer_options.window_size()) {
+        if (node_id.node_index >= window_first_node_index + loop_trimmer_options.window_size_per_submap()) {
           loops_to_remove.erase(std::make_pair(submap_id, node_id_to_retain));
           window_first_node_index = node_id.node_index;
           max_score = std::numeric_limits<float>::min();
@@ -550,15 +612,7 @@ void PoseGraph3D::TrimLoops() {
         loops_to_remove.emplace(submap_id, node_id);
       }
       loops_to_remove.erase(std::make_pair(submap_id, node_id_to_retain));
-      const NodeId& last_node_id = std::prev(connected_nodes.EndOfTrajectory(trajectory_id))->id;
-      if (last_node_id.node_index >
-          last_loop_per_trajectory.at(std::make_pair(submap_id.trajectory_id, trajectory_id)).second.node_index) {
-        last_loop_per_trajectory.at(std::make_pair(submap_id.trajectory_id, trajectory_id)) = std::make_pair(submap_id, last_node_id);
-      }
     }
-  }
-  for (const auto& entry : last_loop_per_trajectory) {
-    loops_to_remove.erase(entry.second);
   }
 
   int num_after = 0;
@@ -567,7 +621,10 @@ void PoseGraph3D::TrimLoops() {
   for (const auto& constraint : data_.constraints) {
     if (constraint.tag == Constraint::INTRA_SUBMAP) {
       trimmed_constraints.push_back(constraint);
-    } else if (loops_to_remove.count(std::make_pair(constraint.submap_id, constraint.node_id)) == 0) {
+    } else if (loops_to_remove.count(std::make_pair(constraint.submap_id, constraint.node_id)) == 0 ||
+          data_.trajectory_connectivity_state.LastConnectionTime(
+              constraint.submap_id.trajectory_id, constraint.node_id.trajectory_id) ==
+          GetLatestNodeTime(constraint.node_id, constraint.submap_id)) {
       trimmed_constraints.push_back(constraint);
       num_after++;
     }
@@ -575,26 +632,30 @@ void PoseGraph3D::TrimLoops() {
   data_.constraints = std::move(trimmed_constraints);
 
   if (options_.log_number_of_trimmed_loops()) {
-    LOG(INFO) << "Trimmed " << num_false_detected_trimmed << " false detected loops";
     LOG(INFO) << "Trimmed " << num_before - num_after <<
         " (" << num_before << " -> " << num_after << ") using search window";
   }
 }
 
+std::vector<PoseGraphInterface::Constraint>
+PoseGraph3D::TrimLoops(const std::vector<PoseGraphInterface::Constraint>& new_loops) {
+  auto true_detected_loops = TrimFalseDetectedLoops(new_loops);
+  TrimLoopsInWindow();
+  return true_detected_loops;
+}
+
 void PoseGraph3D::HandleWorkQueue(
     const constraints::ConstraintBuilder3D::Result& result) {
+  constraints::ConstraintBuilder3D::Result true_detected_loops = TrimLoops(result);
   {
-    // LOG(INFO) << "New non-odometry constraints: " << result.size();
     absl::MutexLock locker(&mutex_);
-    data_.constraints.insert(data_.constraints.end(), result.begin(),
-                             result.end());
+    data_.constraints.insert(data_.constraints.end(), true_detected_loops.begin(),
+                             true_detected_loops.end());
   }
 
   MEASURE_TIME_FROM_HERE(optimization);
   RunOptimization();
   STOP_TIME_MEASUREMENT(optimization);
-
-  TrimLoops();
 
   {
     absl::MutexLock locker(&mutex_);
@@ -1362,6 +1423,7 @@ std::vector<SubmapId> PoseGraph3D::TrimmingHandle::GetSubmapIds(
   }
   return submap_ids;
 }
+
 MapById<SubmapId, PoseGraphInterface::SubmapData>
 PoseGraph3D::TrimmingHandle::GetOptimizedSubmapData() const {
   MapById<SubmapId, PoseGraphInterface::SubmapData> submaps;

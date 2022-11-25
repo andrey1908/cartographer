@@ -4,9 +4,8 @@ package cartographer.mapping.proto;
 
 message LoopTrimmerOptions {
   bool trim_false_detected_loops = 1;
-  float max_translation_error_meters = 2;
-  float max_rotation_error_radians = 3;
+  double max_translation_error_travelled_distance_ratio = 2;
 
-  bool trim_loops_in_window = 4;
-  int32 window_size = 5;
+  bool trim_loops_in_window = 3;
+  int32 window_size_per_submap = 4;
 }

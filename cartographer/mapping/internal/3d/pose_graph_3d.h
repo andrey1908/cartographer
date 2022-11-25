@@ -223,8 +223,14 @@ class PoseGraph3D : public PoseGraph {
   void DrainWorkQueue() LOCKS_EXCLUDED(mutex_)
       LOCKS_EXCLUDED(work_queue_mutex_);
 
-  // Trim close and false detected loops after optimization.
-  void TrimLoops() LOCKS_EXCLUDED(mutex_);
+  // Trim false detected and close loops before optimization.
+  std::vector<PoseGraphInterface::Constraint> TrimFalseDetectedLoops(
+      const std::vector<PoseGraphInterface::Constraint>& new_loops)
+          LOCKS_EXCLUDED(mutex_);
+  void TrimLoopsInWindow() LOCKS_EXCLUDED(mutex_);
+  std::vector<PoseGraphInterface::Constraint> TrimLoops(
+      const std::vector<PoseGraphInterface::Constraint>& new_loops)
+          LOCKS_EXCLUDED(mutex_);
 
   // Runs the optimization. Callers have to make sure, that there is only one
   // optimization being run at a time.
