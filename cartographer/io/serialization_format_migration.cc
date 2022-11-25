@@ -38,7 +38,8 @@
 namespace cartographer {
 namespace io {
 
-using mapping::proto::SerializedData;
+using namespace mapping;
+using proto::SerializedData;
 
 void MigrateStreamVersion(
     cartographer::io::ProtoStreamReaderInterface* const input,
@@ -53,24 +54,23 @@ void MigrateStreamVersion(
       return MAP_BUILDER)text";
   cartographer::common::LuaParameterDictionary lua_parameter_dictionary(
       kCode, std::move(file_resolver));
-  const auto options =
-      mapping::CreateMapBuilderOptions(&lua_parameter_dictionary);
+  const auto options = CreateMapBuilderOptions(&lua_parameter_dictionary);
 
   common::ThreadPool thread_pool(1);
-  mapping::PoseGraph3D pose_graph(
+  PoseGraph3D pose_graph(
       options.pose_graph_options(),
-      absl::make_unique<mapping::optimization::OptimizationProblem3D>(
+      absl::make_unique<optimization::OptimizationProblem3D>(
           options.pose_graph_options().optimization_problem_options()),
       &thread_pool);
 
   ProtoStreamDeserializer deserializer(input);
 
   // Create a copy of the pose_graph_proto
-  mapping::proto::PoseGraph pose_graph_proto = deserializer.pose_graph();
+  proto::PoseGraph pose_graph_proto = deserializer.pose_graph();
   const auto& all_builder_options_proto =
       deserializer.all_trajectory_builder_options();
 
-  std::vector<mapping::proto::TrajectoryBuilderOptionsWithSensorIds>
+  std::vector<proto::TrajectoryBuilderOptionsWithSensorIds>
       trajectory_builder_options;
   for (int i = 0; i < pose_graph_proto.trajectory_size(); ++i) {
     const auto& trajectory_proto = pose_graph_proto.trajectory(i);
@@ -80,20 +80,20 @@ void MigrateStreamVersion(
     trajectory_builder_options.push_back(options_with_sensor_ids_proto);
   }
 
-  mapping::MapById<mapping::SubmapId, transform::Rigid3d> submap_poses;
-  for (const mapping::proto::Trajectory& trajectory_proto : pose_graph_proto.trajectory()) {
-    for (const mapping::proto::Trajectory::Submap& submap_proto : trajectory_proto.submap()) {
+  MapById<SubmapId, transform::Rigid3d> submap_poses;
+  for (const proto::Trajectory& trajectory_proto : pose_graph_proto.trajectory()) {
+    for (const proto::Trajectory::Submap& submap_proto : trajectory_proto.submap()) {
       submap_poses.Insert(
-          mapping::SubmapId{trajectory_proto.trajectory_id(), submap_proto.submap_index()},
+          SubmapId{trajectory_proto.trajectory_id(), submap_proto.submap_index()},
           transform::ToRigid3(submap_proto.pose()));
     }
   }
 
-  mapping::MapById<mapping::NodeId, transform::Rigid3d> node_poses;
-  for (const mapping::proto::Trajectory& trajectory_proto : pose_graph_proto.trajectory()) {
-    for (const mapping::proto::Trajectory::Node& node_proto : trajectory_proto.node()) {
+  MapById<NodeId, transform::Rigid3d> node_poses;
+  for (const proto::Trajectory& trajectory_proto : pose_graph_proto.trajectory()) {
+    for (const proto::Trajectory::Node& node_proto : trajectory_proto.node()) {
       node_poses.Insert(
-          mapping::NodeId{trajectory_proto.trajectory_id(), node_proto.node_index()},
+          NodeId{trajectory_proto.trajectory_id(), node_proto.node_index()},
           transform::ToRigid3(node_proto.pose()));
     }
   }
@@ -106,11 +106,11 @@ void MigrateStreamVersion(
   }
 
   // Data we want to modify before adding to pose_graph (or use for modification)
-  mapping::MapById<mapping::SubmapId, mapping::proto::Submap> submap_id_to_submap;
-  mapping::MapById<mapping::NodeId, mapping::proto::Node> node_id_to_node;
+  MapById<SubmapId, proto::Submap> submap_id_to_submap;
+  MapById<NodeId, proto::Node> node_id_to_node;
 
   SerializedData proto;
-  std::vector<mapping::proto::TrajectoryRosOptions> trajectory_ros_options;
+  std::vector<proto::TrajectoryRosOptions> trajectory_ros_options;
   while (deserializer.ReadNextSerializedData(&proto)) {
     switch (proto.data_case()) {
       case SerializedData::kPoseGraph:
@@ -122,20 +122,16 @@ void MigrateStreamVersion(
                       "corrupt!.";
       case SerializedData::kSubmap: {
         submap_id_to_submap.Insert(
-            mapping::SubmapId{proto.submap().submap_id().trajectory_id(),
-                              proto.submap().submap_id().submap_index()},
+            SubmapId{proto.submap().submap_id().trajectory_id(),
+                     proto.submap().submap_id().submap_index()},
             proto.submap());
         break;
       }
       case SerializedData::kNode: {
         node_id_to_node.Insert(
-            mapping::NodeId{proto.node().node_id().trajectory_id(),
-                            proto.node().node_id().node_index()},
+            NodeId{proto.node().node_id().trajectory_id(),
+                   proto.node().node_id().node_index()},
             proto.node());
-        const mapping::NodeId node_id(proto.node().node_id().trajectory_id(),
-                                      proto.node().node_id().node_index());
-        const transform::Rigid3d& node_pose = node_poses.at(node_id);
-        pose_graph.AddNodeFromProto(node_pose, proto.node());
         break;
       }
       case SerializedData::kTrajectoryData: {
@@ -176,29 +172,32 @@ void MigrateStreamVersion(
     }
   }
 
-  if (deserializer.header().format_version() == kFormatVersionWithoutSubmapHistograms) {
-    submap_id_to_submap = MigrateSubmapFormatVersion1ToVersion2(
-        submap_id_to_submap, node_id_to_node, pose_graph_proto);
+  if (deserializer.header().format_version() <= kFormatVersionWithoutSubmapHistograms) {
+    submap_id_to_submap =
+        AddHistogramsToSubmaps(submap_id_to_submap, node_id_to_node, pose_graph_proto);
+  }
+  if (deserializer.header().format_version() <= kFormatVersionWithoutTravelledDistance) {
+    node_id_to_node =
+        AddTravelledDistanceToNodes(node_id_to_node);
   }
 
   for (const auto& submap_id_submap : submap_id_to_submap) {
-    pose_graph.AddSubmapFromProto(
-        submap_poses.at(submap_id_submap.id),
-        submap_id_submap.data);
+    pose_graph.AddSubmapFromProto(submap_poses.at(submap_id_submap.id), submap_id_submap.data);
   }
-  pose_graph.AddSerializedConstraints(mapping::FromProto(pose_graph_proto.constraint()));
+  for (const auto& node_id_node : node_id_to_node) {
+    pose_graph.AddNodeFromProto(node_poses.at(node_id_node.id), node_id_node.data);
+  }
+  pose_graph.AddSerializedConstraints(FromProto(pose_graph_proto.constraint()));
   CHECK(input->eof());
 
   WritePbStream(pose_graph, trajectory_builder_options, output,
                 include_unfinished_submaps, &trajectory_ros_options);
 }
 
-mapping::MapById<mapping::SubmapId, mapping::proto::Submap>
-MigrateSubmapFormatVersion1ToVersion2(
-    const mapping::MapById<mapping::SubmapId, mapping::proto::Submap>& submap_id_to_submap,
-    mapping::MapById<mapping::NodeId, mapping::proto::Node>& node_id_to_node,
-    const mapping::proto::PoseGraph& pose_graph_proto) {
-  using namespace mapping;
+MapById<SubmapId, proto::Submap> AddHistogramsToSubmaps(
+    const MapById<SubmapId, proto::Submap>& submap_id_to_submap,
+    const MapById<NodeId, proto::Node>& node_id_to_node,
+    const proto::PoseGraph& pose_graph_proto) {
   if (submap_id_to_submap.empty() ||
       submap_id_to_submap.begin()->data.has_submap_2d()) {
     return submap_id_to_submap;
@@ -253,6 +252,26 @@ MigrateSubmapFormatVersion1ToVersion2(
     }
   }
   return migrated_submaps;
+}
+
+MapById<NodeId, proto::Node> AddTravelledDistanceToNodes(
+    const MapById<NodeId, proto::Node>& node_id_to_node) {
+  MapById<NodeId, proto::Node> migrated_nodes;
+  for (int trajectory_id : node_id_to_node.trajectory_ids()) {
+    double travelled_distance = 0.;
+    transform::Rigid3d prev_pose =
+        transform::ToRigid3(
+            node_id_to_node.BeginOfTrajectory(trajectory_id)->data.node_data().local_pose());
+    for (const auto& node_id_node : node_id_to_node.trajectory(trajectory_id)) {
+      transform::Rigid3d pose = transform::ToRigid3(node_id_node.data.node_data().local_pose());
+      travelled_distance += (pose.translation() - prev_pose.translation()).norm();
+      proto::Node node = node_id_node.data;
+      node.mutable_node_data()->set_travelled_distance(travelled_distance);
+      migrated_nodes.Insert(node_id_node.id, node);
+      prev_pose = pose;
+    }
+  }
+  return migrated_nodes;
 }
 
 }  // namespace io

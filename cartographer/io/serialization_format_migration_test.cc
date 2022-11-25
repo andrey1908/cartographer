@@ -86,8 +86,8 @@ TEST_F(SubmapHistogramMigrationTest,
   node_id_to_node.Insert(node_id, node_);
 
   const auto submap_id_to_submap_migrated =
-      MigrateSubmapFormatVersion1ToVersion2(submap_id_to_submap,
-                                            node_id_to_node, pose_graph_);
+      AddHistogramsToSubmaps(submap_id_to_submap,
+                             node_id_to_node, pose_graph_);
 
   EXPECT_EQ(submap_id_to_submap_migrated.size(), submap_id_to_submap.size());
   const mapping::proto::Submap& migrated_submap =

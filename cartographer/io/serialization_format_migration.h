@@ -29,12 +29,13 @@ void MigrateStreamVersion(
     cartographer::io::ProtoStreamWriterInterface* const output,
     bool include_unfinished_submaps);
 
-mapping::MapById<mapping::SubmapId, mapping::proto::Submap>
-MigrateSubmapFormatVersion1ToVersion2(
-    const mapping::MapById<mapping::SubmapId, mapping::proto::Submap>&
-        submap_id_to_submaps,
-    mapping::MapById<mapping::NodeId, mapping::proto::Node>& node_id_to_nodes,
+mapping::MapById<mapping::SubmapId, mapping::proto::Submap> AddHistogramsToSubmaps(
+    const mapping::MapById<mapping::SubmapId, mapping::proto::Submap>& submap_id_to_submaps,
+    const mapping::MapById<mapping::NodeId, mapping::proto::Node>& node_id_to_nodes,
     const mapping::proto::PoseGraph& pose_graph_proto);
+
+mapping::MapById<mapping::NodeId, mapping::proto::Node> AddTravelledDistanceToNodes(
+    const mapping::MapById<mapping::NodeId, mapping::proto::Node>& node_id_to_node);
 
 }  // namespace io
 }  // namespace cartographer
