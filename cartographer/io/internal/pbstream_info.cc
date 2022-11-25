@@ -80,6 +80,7 @@ void Run(const std::string& pbstream_filename, bool all_debug_strings) {
     if (it == data_case_to_name.end()) {
       LOG(WARNING) << "Skipping unknown message type in stream: "
                    << proto.GetTypeName();
+      continue;
     }
     const std::string& data_name = it->second;
     ++data_counts[data_name];
