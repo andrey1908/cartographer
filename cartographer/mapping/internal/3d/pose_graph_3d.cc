@@ -633,7 +633,7 @@ void PoseGraph3D::TrimLoopsInWindow() {
 
   if (options_.log_number_of_trimmed_loops()) {
     LOG(INFO) << "Trimmed " << num_before - num_after <<
-        " (" << num_before << " -> " << num_after << ") using search window";
+        " (" << num_before << " -> " << num_after << ") loops using search window";
   }
 }
 
