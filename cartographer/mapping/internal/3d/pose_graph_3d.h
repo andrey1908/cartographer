@@ -285,6 +285,7 @@ class PoseGraph3D : public PoseGraph {
 
   // List of all trimmers to consult when optimizations finish.
   std::vector<std::unique_ptr<PoseGraphTrimmer>> trimmers_ GUARDED_BY(mutex_);
+  std::set<int> pure_localization_trajectory_ids_ GUARDED_BY(mutex_);
   std::map<int, proto::LoopTrimmerOptions> loop_trimmer_options_ GUARDED_BY(mutex_);
 
   PoseGraphData data_ GUARDED_BY(mutex_);

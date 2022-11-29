@@ -332,6 +332,7 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
   std::vector<SubmapId> submap_ids;
   std::vector<SubmapId> finished_submap_ids;
   std::set<NodeId> newly_finished_submap_node_ids;
+  bool pure_localization_trajectory;
   {
     absl::MutexLock locker(&mutex_);
     const auto& constant_data =
@@ -381,13 +382,14 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
       finished_submap_data.state = SubmapState::kFinished;
       newly_finished_submap_node_ids = finished_submap_data.node_ids;
     }
+    pure_localization_trajectory = pure_localization_trajectory_ids_.count(node_id.trajectory_id);
   }
 
   for (const auto& submap_id : finished_submap_ids) {
     ComputeConstraint(node_id, submap_id);
   }
 
-  if (newly_finished_submap) {
+  if (newly_finished_submap && !pure_localization_trajectory) {
     const SubmapId newly_finished_submap_id = submap_ids.front();
     // We have a new completed submap, so we look into adding constraints for
     // old nodes.
@@ -1059,6 +1061,10 @@ void PoseGraph3D::AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) {
   PoseGraphTrimmer* const trimmer_ptr = trimmer.release();
   AddWorkItem([this, trimmer_ptr]() LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock locker(&mutex_);
+    auto* pure_localization_trimmer_ptr = dynamic_cast<PureLocalizationTrimmer*>(trimmer_ptr);
+    if (pure_localization_trimmer_ptr) {
+      pure_localization_trajectory_ids_.insert(pure_localization_trimmer_ptr->trajectory_id());
+    }
     trimmers_.emplace_back(trimmer_ptr);
     return WorkItem::Result::kDoNotRunOptimization;
   });

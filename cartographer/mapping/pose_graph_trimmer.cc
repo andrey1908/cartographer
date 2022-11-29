@@ -46,5 +46,7 @@ void PureLocalizationTrimmer::Trim(Trimmable* const pose_graph) {
 
 bool PureLocalizationTrimmer::IsFinished() { return finished_; }
 
+int PureLocalizationTrimmer::trajectory_id() { return trajectory_id_; }
+
 }  // namespace mapping
 }  // namespace cartographer

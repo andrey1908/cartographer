@@ -74,6 +74,8 @@ class PureLocalizationTrimmer : public PoseGraphTrimmer {
   void Trim(Trimmable* pose_graph) override;
   bool IsFinished() override;
 
+  int trajectory_id();
+
  private:
   const int trajectory_id_;
   int num_submaps_to_keep_;
