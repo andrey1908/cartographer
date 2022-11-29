@@ -386,6 +386,9 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
   }
 
   for (const auto& submap_id : finished_submap_ids) {
+    if (pure_localization_trajectory && node_id.trajectory_id == submap_id.trajectory_id) {
+      continue;
+    }
     ComputeConstraint(node_id, submap_id);
   }
 
