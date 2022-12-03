@@ -265,7 +265,7 @@ void ConstraintBuilder2D::ComputeConstraint(
                                    {transform::Embed3D(constraint_transform),
                                     options_.loop_closure_translation_weight(),
                                     options_.loop_closure_rotation_weight()},
-                                   Constraint::INTER_SUBMAP});
+                                   Constraint::INTER_SUBMAP, score});
 
   if (options_.log_constraints()) {
     absl::MutexLock locker(&mutex_);
