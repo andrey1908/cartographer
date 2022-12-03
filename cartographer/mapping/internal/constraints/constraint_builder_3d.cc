@@ -60,10 +60,9 @@ static auto* kNumSubmapScanMatchersMetric = metrics::Gauge::Null();
 
 ConstraintBuilder3D::ConstraintBuilder3D(
     const proto::ConstraintBuilderOptions& options,
-    common::ThreadPoolInterface* const thread_pool, int num_range_data /* 0 */)
+    common::ThreadPoolInterface* const thread_pool)
     : options_(options),
       thread_pool_(thread_pool),
-      num_range_data_(num_range_data),
       finish_node_task_(absl::make_unique<common::Task>()),
       when_done_task_(absl::make_unique<common::Task>()),
       ceres_scan_matcher_(options.ceres_scan_matcher_options_3d()) {}
@@ -82,12 +81,6 @@ void ConstraintBuilder3D::MaybeAddConstraint(
     const NodeId& node_id, const TrajectoryNode::Data* const constant_data,
     const transform::Rigid3d& global_node_pose,
     const transform::Rigid3d& global_submap_pose) {
-  // if (num_range_data_ > 0) {
-  //   int submap_index_for_node = node_id.node_index / num_range_data_;
-  //   if (submap_index_for_node < submap_id.submap_index && submap_index_for_node >= submap_id.submap_index - 2) {
-  //     return;
-  //   }
-  // }
   if ((global_node_pose.translation() - global_submap_pose.translation())
           .norm() > options_.max_constraint_distance()) {
     return;
@@ -299,17 +292,17 @@ void ConstraintBuilder3D::ComputeConstraint(
       Constraint::INTER_SUBMAP, match_result->score});
 
   if (options_.log_constraints()) {
+    absl::MutexLock locker(&mutex_);
     std::ostringstream info;
     if (match_full_submap) {
       info << "Global. ";
     }
-    if (num_range_data_ > 0) {
-      SubmapId submap_id_for_node(node_id.trajectory_id, node_id.node_index / num_range_data_);
-      info << "Node from " << submap_id_for_node;
-    } else {
-      info << "Node " << node_id;
-    }
-    info << ", submap " << submap_id << ", score " << std::setprecision(3) << match_result->score;
+    CHECK(node_id_to_submap_ids_.count(node_id));
+    const auto& submap_ids = node_id_to_submap_ids_.at(node_id);
+    CHECK(submap_ids.size());
+    SubmapId submap_id_for_node(*submap_ids.rbegin());
+    info << "Node from " << submap_id_for_node <<
+      ", submap " << submap_id << ", score " << std::setprecision(3) << match_result->score;
     LOG(INFO) << info.str();
   }
 
@@ -384,6 +377,19 @@ void ConstraintBuilder3D::DeleteScanMatcher(const SubmapId& submap_id) {
   submap_scan_matchers_.erase(submap_id);
   per_submap_sampler_.erase(submap_id);
   kNumSubmapScanMatchersMetric->Set(submap_scan_matchers_.size());
+}
+
+void ConstraintBuilder3D::ConnectNodeWithSubmap(const NodeId& node_id, const SubmapId& submap_id) {
+  absl::MutexLock locker(&mutex_);
+  node_id_to_submap_ids_[node_id].emplace(submap_id);
+}
+
+void ConstraintBuilder3D::RemoveNodeFromSubmap(const NodeId& node_id, const SubmapId& submap_id) {
+  absl::MutexLock locker(&mutex_);
+  CHECK(node_id_to_submap_ids_.count(node_id));
+  auto& submap_ids = node_id_to_submap_ids_.at(node_id);
+  CHECK(submap_ids.count(submap_id));
+  submap_ids.erase(submap_id);
 }
 
 void ConstraintBuilder3D::RegisterMetrics(metrics::FamilyFactory* factory) {

@@ -83,7 +83,7 @@ void MaybeAddLoopTrimmer(
 
 }  // namespace
 
-MapBuilder::MapBuilder(const proto::MapBuilderOptions& options, int num_range_data_2d /* 0 */, int num_range_data_3d /* 0 */)
+MapBuilder::MapBuilder(const proto::MapBuilderOptions& options)
     : options_(options), thread_pool_(options.num_background_threads()) {
   CHECK(options.use_trajectory_builder_2d() ^
         options.use_trajectory_builder_3d());
@@ -92,14 +92,14 @@ MapBuilder::MapBuilder(const proto::MapBuilderOptions& options, int num_range_da
         options_.pose_graph_options(),
         absl::make_unique<optimization::OptimizationProblem2D>(
             options_.pose_graph_options().optimization_problem_options()),
-        &thread_pool_, num_range_data_2d);
+        &thread_pool_);
   }
   if (options.use_trajectory_builder_3d()) {
     pose_graph_ = absl::make_unique<PoseGraph3D>(
         options_.pose_graph_options(),
         absl::make_unique<optimization::OptimizationProblem3D>(
             options_.pose_graph_options().optimization_problem_options()),
-        &thread_pool_, num_range_data_3d);
+        &thread_pool_);
   }
   if (options.collate_by_trajectory()) {
     sensor_collator_ = absl::make_unique<sensor::TrajectoryCollator>();
@@ -415,8 +415,8 @@ std::map<int, int> MapBuilder::LoadStateFromFile(
 }
 
 std::unique_ptr<MapBuilderInterface> CreateMapBuilder(
-    const proto::MapBuilderOptions& options, int num_range_data_2d /* 0 */, int num_range_data_3d /* 0 */) {
-  return absl::make_unique<MapBuilder>(options, num_range_data_2d, num_range_data_3d);
+    const proto::MapBuilderOptions& options) {
+  return absl::make_unique<MapBuilder>(options);
 }
 
 }  // namespace mapping

@@ -58,10 +58,9 @@ transform::Rigid2d ComputeSubmapPose(const Submap2D& submap) {
 
 ConstraintBuilder2D::ConstraintBuilder2D(
     const constraints::proto::ConstraintBuilderOptions& options,
-    common::ThreadPoolInterface* const thread_pool, int num_range_data /* 0 */)
+    common::ThreadPoolInterface* const thread_pool)
     : options_(options),
       thread_pool_(thread_pool),
-      num_range_data_(num_range_data),
       finish_node_task_(absl::make_unique<common::Task>()),
       when_done_task_(absl::make_unique<common::Task>()),
       ceres_scan_matcher_(options.ceres_scan_matcher_options()) {}
@@ -79,12 +78,6 @@ void ConstraintBuilder2D::MaybeAddConstraint(
     const SubmapId& submap_id, const Submap2D* const submap,
     const NodeId& node_id, const TrajectoryNode::Data* const constant_data,
     const transform::Rigid2d& initial_relative_pose) {
-  // if (num_range_data_ > 0) {
-  //   int submap_index_for_node = node_id.node_index / num_range_data_;
-  //   if (submap_index_for_node < submap_id.submap_index && submap_index_for_node >= submap_id.submap_index - 2) {
-  //     return;
-  //   }
-  // }
   if (initial_relative_pose.translation().norm() >
       options_.max_constraint_distance()) {
     return;
@@ -275,17 +268,17 @@ void ConstraintBuilder2D::ComputeConstraint(
                                    Constraint::INTER_SUBMAP});
 
   if (options_.log_constraints()) {
+    absl::MutexLock locker(&mutex_);
     std::ostringstream info;
     if (match_full_submap) {
       info << "Global. ";
     }
-    if (num_range_data_ > 0) {
-      SubmapId submap_id_for_node(node_id.trajectory_id, node_id.node_index / num_range_data_);
-      info << "Node from " << submap_id_for_node;
-    } else {
-      info << "Node " << node_id;
-    }
-    info << ", submap " << submap_id << ", score " << std::setprecision(3) << score;
+    CHECK(node_id_to_submap_ids_.count(node_id));
+    const auto& submap_ids = node_id_to_submap_ids_.at(node_id);
+    CHECK(submap_ids.size());
+    SubmapId submap_id_for_node(*submap_ids.rbegin());
+    info << "Node from " << submap_id_for_node <<
+      ", submap " << submap_id << ", score " << std::setprecision(3) << score;
     LOG(INFO) << info.str();
   }
 
@@ -351,6 +344,19 @@ void ConstraintBuilder2D::DeleteScanMatcher(const SubmapId& submap_id) {
   submap_scan_matchers_.erase(submap_id);
   per_submap_sampler_.erase(submap_id);
   kNumSubmapScanMatchersMetric->Set(submap_scan_matchers_.size());
+}
+
+void ConstraintBuilder2D::ConnectNodeWithSubmap(const NodeId& node_id, const SubmapId& submap_id) {
+  absl::MutexLock locker(&mutex_);
+  node_id_to_submap_ids_[node_id].emplace(submap_id);
+}
+
+void ConstraintBuilder2D::RemoveNodeFromSubmap(const NodeId& node_id, const SubmapId& submap_id) {
+  absl::MutexLock locker(&mutex_);
+  CHECK(node_id_to_submap_ids_.count(node_id));
+  auto& submap_ids = node_id_to_submap_ids_.at(node_id);
+  CHECK(submap_ids.count(submap_id));
+  submap_ids.erase(submap_id);
 }
 
 void ConstraintBuilder2D::RegisterMetrics(metrics::FamilyFactory* factory) {

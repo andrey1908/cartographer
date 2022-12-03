@@ -64,7 +64,7 @@ class ConstraintBuilder3D {
   using Result = std::vector<Constraint>;
 
   ConstraintBuilder3D(const proto::ConstraintBuilderOptions& options,
-                      common::ThreadPoolInterface* thread_pool, int num_range_data = 0);
+                      common::ThreadPoolInterface* thread_pool);
   ~ConstraintBuilder3D();
 
   ConstraintBuilder3D(const ConstraintBuilder3D&) = delete;
@@ -113,6 +113,11 @@ class ConstraintBuilder3D {
   // Delete data related to 'submap_id'.
   void DeleteScanMatcher(const SubmapId& submap_id);
 
+  void ConnectNodeWithSubmap(const NodeId& node_id, const SubmapId& submap_id)
+      LOCKS_EXCLUDED(mutex_);
+  void RemoveNodeFromSubmap(const NodeId& node_id, const SubmapId& submap_id)
+      LOCKS_EXCLUDED(mutex_);
+
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
 
  private:
@@ -146,7 +151,6 @@ class ConstraintBuilder3D {
 
   const proto::ConstraintBuilderOptions options_;
   common::ThreadPoolInterface* thread_pool_;
-  int num_range_data_;
   absl::Mutex mutex_;
 
   // 'callback' set by WhenDone().
@@ -181,6 +185,9 @@ class ConstraintBuilder3D {
   common::Histogram score_histogram_ GUARDED_BY(mutex_);
   common::Histogram rotational_score_histogram_ GUARDED_BY(mutex_);
   common::Histogram low_resolution_score_histogram_ GUARDED_BY(mutex_);
+
+  // Match node with corresponding submap
+  std::map<NodeId, std::set<SubmapId>> node_id_to_submap_ids_ GUARDED_BY(mutex_);
 };
 
 }  // namespace constraints

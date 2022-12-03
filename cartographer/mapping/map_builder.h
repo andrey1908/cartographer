@@ -32,7 +32,7 @@ namespace mapping {
 // and a PoseGraph for loop closure.
 class MapBuilder : public MapBuilderInterface {
  public:
-  explicit MapBuilder(const proto::MapBuilderOptions &options, int num_range_data_2d = 0, int num_range_data_3d = 0);
+  explicit MapBuilder(const proto::MapBuilderOptions &options);
   ~MapBuilder() override {}
 
   MapBuilder(const MapBuilder &) = delete;
@@ -104,7 +104,7 @@ class MapBuilder : public MapBuilderInterface {
 };
 
 std::unique_ptr<MapBuilderInterface> CreateMapBuilder(
-    const proto::MapBuilderOptions& options, int num_range_data_2d = 0, int num_range_data_3d = 0);
+    const proto::MapBuilderOptions& options);
 
 }  // namespace mapping
 }  // namespace cartographer

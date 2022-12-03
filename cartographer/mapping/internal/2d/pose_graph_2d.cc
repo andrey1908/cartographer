@@ -52,10 +52,10 @@ static auto* kDeletedSubmapsMetric = metrics::Gauge::Null();
 PoseGraph2D::PoseGraph2D(
     const proto::PoseGraphOptions& options,
     std::unique_ptr<optimization::OptimizationProblem2D> optimization_problem,
-    common::ThreadPool* thread_pool, int num_range_data /* 0 */)
+    common::ThreadPool* thread_pool)
     : options_(options),
       optimization_problem_(std::move(optimization_problem)),
-      constraint_builder_(options_.constraint_builder_options(), thread_pool, num_range_data),
+      constraint_builder_(options_.constraint_builder_options(), thread_pool),
       thread_pool_(thread_pool) {
   if (options.has_overlapping_submaps_trimmer_2d()) {
     const auto& trimmer_options = options.overlapping_submaps_trimmer_2d();
@@ -344,6 +344,7 @@ WorkItem::Result PoseGraph2D::ComputeConstraintsForNode(
       CHECK(data_.submap_data.at(submap_id).state ==
             SubmapState::kNoConstraintSearch);
       data_.submap_data.at(submap_id).node_ids.emplace(node_id);
+      constraint_builder_.ConnectNodeWithSubmap(node_id, submap_id);
       const transform::Rigid2d constraint_transform =
           constraints::ComputeSubmapPose(*insertion_submaps[i]).inverse() *
           local_pose_2d;
@@ -831,6 +832,7 @@ void PoseGraph2D::AddNodeToSubmap(const NodeId& node_id,
     absl::MutexLock locker(&mutex_);
     if (CanAddWorkItemModifying(submap_id.trajectory_id)) {
       data_.submap_data.at(submap_id).node_ids.insert(node_id);
+      constraint_builder_.ConnectNodeWithSubmap(node_id, submap_id);
     }
     return WorkItem::Result::kDoNotRunOptimization;
   });
@@ -851,6 +853,7 @@ void PoseGraph2D::AddSerializedConstraints(
           CHECK(data_.submap_data.at(constraint.submap_id)
                     .node_ids.emplace(constraint.node_id)
                     .second);
+          constraint_builder_.ConnectNodeWithSubmap(constraint.node_id, constraint.submap_id);
           break;
         case Constraint::Tag::INTER_SUBMAP:
           UpdateTrajectoryConnectivity(constraint);
@@ -1266,6 +1269,10 @@ void PoseGraph2D::TrimmingHandle::TrimSubmap(const SubmapId& submap_id) {
   // if we want to delete the last submaps.
   CHECK(parent_->data_.submap_data.at(submap_id).state ==
         SubmapState::kFinished);
+
+  for (const NodeId& node_id : parent_->data_.submap_data.at(submap_id).node_ids) {
+    parent_->constraint_builder_.RemoveNodeFromSubmap(node_id, submap_id);
+  }
 
   // Compile all nodes that are still INTRA_SUBMAP constrained to other submaps
   // once the submap with 'submap_id' is gone.
