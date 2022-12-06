@@ -329,28 +329,24 @@ std::map<int, int> MapBuilder::LoadState(
         break;
       }
       case SerializedData::kImuData: {
-        if (load_frozen_state) break;
         pose_graph_->AddImuData(
             trajectory_remapping.at(proto.imu_data().trajectory_id()),
             sensor::FromProto(proto.imu_data().imu_data()));
         break;
       }
       case SerializedData::kOdometryData: {
-        if (load_frozen_state) break;
         pose_graph_->AddOdometryData(
             trajectory_remapping.at(proto.odometry_data().trajectory_id()),
             sensor::FromProto(proto.odometry_data().odometry_data()));
         break;
       }
       case SerializedData::kFixedFramePoseData: {
-        if (load_frozen_state) break;
         pose_graph_->AddFixedFramePoseData(
             trajectory_remapping.at(proto.fixed_frame_pose_data().trajectory_id()),
             sensor::FromProto(proto.fixed_frame_pose_data().fixed_frame_pose_data()));
         break;
       }
       case SerializedData::kLandmarkData: {
-        if (load_frozen_state) break;
         pose_graph_->AddLandmarkData(
             trajectory_remapping.at(proto.landmark_data().trajectory_id()),
             sensor::FromProto(proto.landmark_data().landmark_data()));
@@ -370,27 +366,9 @@ std::map<int, int> MapBuilder::LoadState(
     }
   }
 
-  if (load_frozen_state) {
-    // Add information about which nodes belong to which submap.
-    // This is required, even without constraints.
-    for (const proto::PoseGraph::Constraint& constraint_proto :
-         pose_graph_proto.constraint()) {
-      if (constraint_proto.tag() !=
-          proto::PoseGraph::Constraint::INTRA_SUBMAP) {
-        continue;
-      }
-      pose_graph_->AddNodeToSubmap(
-          NodeId{constraint_proto.node_id().trajectory_id(),
-                 constraint_proto.node_id().node_index()},
-          SubmapId{constraint_proto.submap_id().trajectory_id(),
-                   constraint_proto.submap_id().submap_index()});
-    }
-  } else {
-    // When loading unfrozen trajectories, 'AddSerializedConstraints' will
-    // take care of adding information about which nodes belong to which
-    // submap.
-    pose_graph_->AddSerializedConstraints(
-        FromProto(pose_graph_proto.constraint()));
+  pose_graph_->AddSerializedConstraints(
+      FromProto(pose_graph_proto.constraint()));
+  if (!load_frozen_state) {
     const auto& trajectory_states = pose_graph_->GetTrajectoryStates();
     for (const auto& trajectory_id_state : trajectory_states) {
       pose_graph_->FinishTrajectory(trajectory_id_state.first);

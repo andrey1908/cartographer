@@ -124,25 +124,30 @@ transform::Rigid3d GetInitialLandmarkPose(
 void AddLandmarkCostFunctions(
     const std::map<std::string, LandmarkNode>& landmark_nodes,
     const MapById<NodeId, NodeSpec3D>& node_data,
+    const std::set<int>& frozen_trajectories,
     MapById<NodeId, CeresPose>* C_nodes,
     std::map<std::string, CeresPose>* C_landmarks, ceres::Problem* problem,
     double huber_scale) {
   for (const auto& landmark_node : landmark_nodes) {
     // Do not use landmarks that were not optimized for localization.
     for (const auto& observation : landmark_node.second.landmark_observations) {
+      int trajectory_id = observation.trajectory_id;
+      if (frozen_trajectories.count(trajectory_id) != 0) {
+        continue;
+      }
       const std::string& landmark_id = landmark_node.first;
       const auto& begin_of_trajectory =
-          node_data.BeginOfTrajectory(observation.trajectory_id);
+          node_data.BeginOfTrajectory(trajectory_id);
       // The landmark observation was made before the trajectory was created.
       if (observation.time < begin_of_trajectory->data.time) {
         continue;
       }
       // Find the trajectory nodes before and after the landmark observation.
       auto next =
-          node_data.lower_bound(observation.trajectory_id, observation.time);
+          node_data.lower_bound(trajectory_id, observation.time);
       // The landmark observation was made, but the next trajectory node has
       // not been added yet.
-      if (next == node_data.EndOfTrajectory(observation.trajectory_id)) {
+      if (next == node_data.EndOfTrajectory(trajectory_id)) {
         continue;
       }
       if (next == begin_of_trajectory) {
@@ -335,6 +340,10 @@ void OptimizationProblem3D::Solve(
   }
   // Add cost functions for intra- and inter-submap constraints.
   for (const Constraint& constraint : constraints) {
+    if (constraint.node_id.trajectory_id == constraint.submap_id.trajectory_id &&
+        frozen_trajectories.count(constraint.node_id.trajectory_id)) {
+      continue;
+    }
     problem.AddResidualBlock(
         SpaCostFunction3D::CreateAutoDiffCostFunction(constraint.pose),
         // Loop closure constraints should have a loss function.
@@ -347,7 +356,7 @@ void OptimizationProblem3D::Solve(
         C_nodes.at(constraint.node_id).translation());
   }
   // Add cost functions for landmarks.
-  AddLandmarkCostFunctions(landmark_nodes, node_data_, &C_nodes, &C_landmarks,
+  AddLandmarkCostFunctions(landmark_nodes, node_data_, frozen_trajectories, &C_nodes, &C_landmarks,
                            &problem, options_.huber_scale());
   // Add constraints based on IMU observations of angular velocities and
   // linear acceleration.
@@ -515,6 +524,10 @@ void OptimizationProblem3D::Solve(
   for (auto node_it = node_data_.begin(); node_it != node_data_.end();) {
     const int trajectory_id = node_it->id.trajectory_id;
     const auto trajectory_end = node_data_.EndOfTrajectory(trajectory_id);
+    if (frozen_trajectories.count(trajectory_id) != 0) {
+      node_it = trajectory_end;
+      continue;
+    }
     if (!fixed_frame_pose_data_.HasTrajectory(trajectory_id)) {
       node_it = trajectory_end;
       continue;
