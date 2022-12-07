@@ -57,6 +57,7 @@ PoseGraph2D::PoseGraph2D(
       optimization_problem_(std::move(optimization_problem)),
       constraint_builder_(options_.constraint_builder_options(), thread_pool),
       thread_pool_(thread_pool) {
+  CHECK(false) << "2d pose graph is not supported";
   if (options.has_overlapping_submaps_trimmer_2d()) {
     const auto& trimmer_options = options.overlapping_submaps_trimmer_2d();
     AddTrimmer(absl::make_unique<OverlappingSubmapsTrimmer2D>(
@@ -198,12 +199,6 @@ void PoseGraph2D::AddTrajectoryIfNeeded(const int trajectory_id) {
   CHECK(data_.trajectories_state.at(trajectory_id).deletion_state ==
         InternalTrajectoryState::DeletionState::NORMAL);
   data_.trajectory_connectivity_state.Add(trajectory_id);
-  // Make sure we have a sampler for this trajectory.
-  if (!global_localization_samplers_[trajectory_id]) {
-    global_localization_samplers_[trajectory_id] =
-        absl::make_unique<common::FixedRatioSampler>(
-            options_.global_sampling_ratio());
-  }
 }
 
 void PoseGraph2D::AddImuData(const int trajectory_id,
@@ -258,55 +253,42 @@ void PoseGraph2D::AddLandmarkData(int trajectory_id,
   });
 }
 
-void PoseGraph2D::ComputeConstraint(const NodeId& node_id,
-                                    const SubmapId& submap_id) {
-  bool maybe_add_local_constraint = false;
-  bool maybe_add_global_constraint = false;
-  const TrajectoryNode::Data* constant_data;
-  const Submap2D* submap;
+std::pair<bool, bool> PoseGraph2D::CheckIfConstraintCanBeAdded(
+    const NodeId& node_id,
+    const SubmapId& submap_id,
+    bool only_local_constraint /* false */,
+    bool only_global_constraint /* false */) {
+  CHECK(!(only_local_constraint && only_global_constraint));
+
+  bool local_constraint_can_be_added = false;
+  bool global_constraint_can_be_added = false;
   {
     absl::MutexLock locker(&mutex_);
     CHECK(data_.submap_data.at(submap_id).state == SubmapState::kFinished);
-    if (!data_.submap_data.at(submap_id).submap->insertion_finished()) {
-      // Uplink server only receives grids when they are finished, so skip
-      // constraint search before that.
-      return;
-    }
+    CHECK(data_.submap_data.at(submap_id).submap->insertion_finished());
 
-    const common::Time node_time = GetLatestNodeTime(node_id, submap_id);
+    const common::Time latest_node_time = GetLatestNodeTime(node_id, submap_id);
     const common::Time last_connection_time =
         data_.trajectory_connectivity_state.LastConnectionTime(
             node_id.trajectory_id, submap_id.trajectory_id);
+    const bool connected =
+        data_.trajectory_connectivity_state.TransitivelyConnected(
+            node_id.trajectory_id, submap_id.trajectory_id);
+    const common::Duration global_constraint_search_after_n_seconds =
+        common::FromSeconds(options_.global_constraint_search_after_n_seconds());
+    const bool recently_connected =
+        (last_connection_time + global_constraint_search_after_n_seconds > latest_node_time);
     if (node_id.trajectory_id == submap_id.trajectory_id ||
-        node_time <
-            last_connection_time +
-                common::FromSeconds(
-                    options_.global_constraint_search_after_n_seconds())) {
-      // If the node and the submap belong to the same trajectory or if there
-      // has been a recent global constraint that ties that node's trajectory to
-      // the submap's trajectory, it suffices to do a match constrained to a
-      // local search window.
-      maybe_add_local_constraint = true;
-    } else if (global_localization_samplers_[node_id.trajectory_id]->Pulse()) {
-      maybe_add_global_constraint = true;
+        (connected &&
+          (global_constraint_search_after_n_seconds == common::Duration() || recently_connected) &&
+          !only_global_constraint) ||
+        only_local_constraint) {
+      local_constraint_can_be_added = true;
+    } else {
+      global_constraint_can_be_added = true;
     }
-    constant_data = data_.trajectory_nodes.at(node_id).constant_data.get();
-    submap = static_cast<const Submap2D*>(
-        data_.submap_data.at(submap_id).submap.get());
   }
-
-  if (maybe_add_local_constraint) {
-    const transform::Rigid2d initial_relative_pose =
-        optimization_problem_->submap_data()
-            .at(submap_id)
-            .global_pose.inverse() *
-        optimization_problem_->node_data().at(node_id).global_pose_2d;
-    constraint_builder_.MaybeAddConstraint(
-        submap_id, submap, node_id, constant_data, initial_relative_pose);
-  } else if (maybe_add_global_constraint) {
-    constraint_builder_.MaybeAddGlobalConstraint(submap_id, submap, node_id,
-                                                 constant_data);
-  }
+  return std::make_pair(local_constraint_can_be_added, global_constraint_can_be_added);
 }
 
 WorkItem::Result PoseGraph2D::ComputeConstraintsForNode(
@@ -377,21 +359,21 @@ WorkItem::Result PoseGraph2D::ComputeConstraintsForNode(
     }
   }
 
-  for (const auto& submap_id : finished_submap_ids) {
-    ComputeConstraint(node_id, submap_id);
-  }
+  // for (const auto& submap_id : finished_submap_ids) {
+  //   ComputeConstraint(node_id, submap_id);
+  // }
 
-  if (newly_finished_submap) {
-    const SubmapId newly_finished_submap_id = submap_ids.front();
-    // We have a new completed submap, so we look into adding constraints for
-    // old nodes.
-    for (const auto& node_id_data : optimization_problem_->node_data()) {
-      const NodeId& node_id = node_id_data.id;
-      if (newly_finished_submap_node_ids.count(node_id) == 0) {
-        ComputeConstraint(node_id, newly_finished_submap_id);
-      }
-    }
-  }
+  // if (newly_finished_submap) {
+  //   const SubmapId newly_finished_submap_id = submap_ids.front();
+  //   // We have a new completed submap, so we look into adding constraints for
+  //   // old nodes.
+  //   for (const auto& node_id_data : optimization_problem_->node_data()) {
+  //     const NodeId& node_id = node_id_data.id;
+  //     if (newly_finished_submap_node_ids.count(node_id) == 0) {
+  //       ComputeConstraint(node_id, newly_finished_submap_id);
+  //     }
+  //   }
+  // }
   constraint_builder_.NotifyEndOfNode();
   absl::MutexLock locker(&mutex_);
   ++num_nodes_since_last_loop_closure_;

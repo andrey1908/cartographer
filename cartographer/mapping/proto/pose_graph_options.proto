@@ -24,6 +24,10 @@ message PoseGraphOptions {
   // is built.
   int32 optimize_every_n_nodes = 1;
 
+  double max_local_constraint_distance = 14;
+  double local_constraints_per_node = 2;
+  double global_constraints_per_node = 5;
+
   // Options for the constraint builder.
   mapping.constraints.proto.ConstraintBuilderOptions
       constraint_builder_options = 3;
@@ -43,10 +47,6 @@ message PoseGraphOptions {
   // Number of iterations to use in 'optimization_problem_options' for the final
   // optimization.
   int32 max_num_final_iterations = 6;
-
-  // Rate at which we sample a single trajectory's nodes for global
-  // localization.
-  double global_sampling_ratio = 5;
 
   // Log work queue size.
   bool log_work_queue_size = 12;

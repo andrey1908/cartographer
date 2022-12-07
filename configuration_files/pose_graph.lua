@@ -14,9 +14,10 @@
 
 POSE_GRAPH = {
   optimize_every_n_nodes = 90,
+  max_local_constraint_distance = 15.,
+  local_constraints_per_node = 0.1,
+  global_constraints_per_node = 0.1,
   constraint_builder = {
-    sampling_ratio = 0.3,
-    max_constraint_distance = 15.,
     min_score = 0.55,
     global_localization_min_score = 0.6,
     loop_closure_translation_weight = 1.1e4,
@@ -87,7 +88,6 @@ POSE_GRAPH = {
     },
   },
   max_num_final_iterations = 200,
-  global_sampling_ratio = 0.003,
   log_work_queue_size = false,
   log_residual_histograms = true,
   log_number_of_trimmed_loops = false,

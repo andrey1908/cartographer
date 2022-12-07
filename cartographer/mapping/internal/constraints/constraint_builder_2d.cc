@@ -78,16 +78,16 @@ void ConstraintBuilder2D::MaybeAddConstraint(
     const SubmapId& submap_id, const Submap2D* const submap,
     const NodeId& node_id, const TrajectoryNode::Data* const constant_data,
     const transform::Rigid2d& initial_relative_pose) {
-  if (initial_relative_pose.translation().norm() >
-      options_.max_constraint_distance()) {
-    return;
-  }
-  if (!per_submap_sampler_
-           .emplace(std::piecewise_construct, std::forward_as_tuple(submap_id),
-                    std::forward_as_tuple(options_.sampling_ratio()))
-           .first->second.Pulse()) {
-    return;
-  }
+  // if (initial_relative_pose.translation().norm() >
+  //     options_.max_constraint_distance()) {
+  //   return;
+  // }
+  // if (!per_submap_sampler_
+  //          .emplace(std::piecewise_construct, std::forward_as_tuple(submap_id),
+  //                   std::forward_as_tuple(options_.sampling_ratio()))
+  //          .first->second.Pulse()) {
+  //   return;
+  // }
 
   absl::MutexLock locker(&mutex_);
   if (when_done_) {

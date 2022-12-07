@@ -90,6 +90,14 @@ proto::PoseGraphOptions CreatePoseGraphOptions(
   proto::PoseGraphOptions options;
   options.set_optimize_every_n_nodes(
       parameter_dictionary->GetInt("optimize_every_n_nodes"));
+  options.set_max_local_constraint_distance(
+      parameter_dictionary->GetDouble("max_local_constraint_distance"));
+  options.set_local_constraints_per_node(
+      parameter_dictionary->GetDouble("local_constraints_per_node"));
+  CHECK_GE(options.local_constraints_per_node(), 0.0);
+  options.set_global_constraints_per_node(
+      parameter_dictionary->GetDouble("global_constraints_per_node"));
+  CHECK_GE(options.global_constraints_per_node(), 0.0);
   *options.mutable_constraint_builder_options() =
       constraints::CreateConstraintBuilderOptions(
           parameter_dictionary->GetDictionary("constraint_builder").get());
@@ -103,8 +111,6 @@ proto::PoseGraphOptions CreatePoseGraphOptions(
   options.set_max_num_final_iterations(
       parameter_dictionary->GetNonNegativeInt("max_num_final_iterations"));
   CHECK_GT(options.max_num_final_iterations(), 0);
-  options.set_global_sampling_ratio(
-      parameter_dictionary->GetDouble("global_sampling_ratio"));
   options.set_log_work_queue_size(
       parameter_dictionary->GetBool("log_work_queue_size"));
   options.set_log_residual_histograms(

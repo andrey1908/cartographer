@@ -200,9 +200,11 @@ class PoseGraph2D : public PoseGraph {
       std::vector<std::shared_ptr<const Submap2D>> insertion_submaps,
       bool newly_finished_submap) LOCKS_EXCLUDED(mutex_);
 
-  // Computes constraints for a node and submap pair.
-  void ComputeConstraint(const NodeId& node_id, const SubmapId& submap_id)
-      LOCKS_EXCLUDED(mutex_);
+  std::pair<bool, bool> CheckIfConstraintCanBeAdded(
+      const NodeId& node_id,
+      const SubmapId& submap_id,
+      bool only_local_constraint = false,
+      bool only_global_constraint = false) LOCKS_EXCLUDED(mutex_);
 
   // Deletes trajectories waiting for deletion. Must not be called during
   // constraint search.
@@ -254,10 +256,6 @@ class PoseGraph2D : public PoseGraph {
   // If it exists, further work items must be added to this queue, and will be
   // considered later.
   std::unique_ptr<WorkQueue> work_queue_ GUARDED_BY(work_queue_mutex_);
-
-  // We globally localize a fraction of the nodes from each trajectory.
-  absl::flat_hash_map<int, std::unique_ptr<common::FixedRatioSampler>>
-      global_localization_samplers_ GUARDED_BY(mutex_);
 
   // Number of nodes added since last loop closure.
   int num_nodes_since_last_loop_closure_ GUARDED_BY(mutex_) = 0;

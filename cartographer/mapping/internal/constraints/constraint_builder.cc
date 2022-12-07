@@ -29,9 +29,6 @@ namespace constraints {
 proto::ConstraintBuilderOptions CreateConstraintBuilderOptions(
     common::LuaParameterDictionary* const parameter_dictionary) {
   proto::ConstraintBuilderOptions options;
-  options.set_sampling_ratio(parameter_dictionary->GetDouble("sampling_ratio"));
-  options.set_max_constraint_distance(
-      parameter_dictionary->GetDouble("max_constraint_distance"));
   options.set_min_score(parameter_dictionary->GetDouble("min_score"));
   options.set_global_localization_min_score(
       parameter_dictionary->GetDouble("global_localization_min_score"));

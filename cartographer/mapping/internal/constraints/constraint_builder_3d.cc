@@ -81,17 +81,6 @@ void ConstraintBuilder3D::MaybeAddConstraint(
     const NodeId& node_id, const TrajectoryNode::Data* const constant_data,
     const transform::Rigid3d& global_node_pose,
     const transform::Rigid3d& global_submap_pose) {
-  if ((global_node_pose.translation() - global_submap_pose.translation())
-          .norm() > options_.max_constraint_distance()) {
-    return;
-  }
-  if (!per_submap_sampler_
-           .emplace(std::piecewise_construct, std::forward_as_tuple(submap_id),
-                    std::forward_as_tuple(options_.sampling_ratio()))
-           .first->second.Pulse()) {
-    return;
-  }
-
   absl::MutexLock locker(&mutex_);
   if (when_done_) {
     LOG(WARNING)
@@ -375,7 +364,6 @@ void ConstraintBuilder3D::DeleteScanMatcher(const SubmapId& submap_id) {
         << "DeleteScanMatcher was called while WhenDone was scheduled.";
   }
   submap_scan_matchers_.erase(submap_id);
-  per_submap_sampler_.erase(submap_id);
   kNumSubmapScanMatchersMetric->Set(submap_scan_matchers_.size());
 }
 

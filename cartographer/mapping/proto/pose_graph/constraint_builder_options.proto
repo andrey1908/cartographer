@@ -22,13 +22,6 @@ import "cartographer/mapping/proto/scan_matching/fast_correlative_scan_matcher_o
 import "cartographer/mapping/proto/scan_matching/fast_correlative_scan_matcher_options_3d.proto";
 
 message ConstraintBuilderOptions {
-  // A constraint will be added if the proportion of added constraints to
-  // potential constraints drops below this number.
-  double sampling_ratio = 1;
-
-  // Threshold for poses to be considered near a submap.
-  double max_constraint_distance = 2;
-
   // Threshold for the scan match score below which a match is not considered.
   // Low scores indicate that the scan and map do not look similar.
   double min_score = 4;

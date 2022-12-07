@@ -177,7 +177,6 @@ class ConstraintBuilder3D {
   // Map of dispatched or constructed scan matchers by 'submap_id'.
   std::map<SubmapId, SubmapScanMatcher> submap_scan_matchers_
       GUARDED_BY(mutex_);
-  std::map<SubmapId, common::FixedRatioSampler> per_submap_sampler_;
 
   scan_matching::CeresScanMatcher3D ceres_scan_matcher_;
 

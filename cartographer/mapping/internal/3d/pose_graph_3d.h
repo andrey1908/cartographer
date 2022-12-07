@@ -170,10 +170,30 @@ class PoseGraph3D : public PoseGraph {
   void WaitForAllComputations(bool quiet = false) LOCKS_EXCLUDED(mutex_)
       LOCKS_EXCLUDED(work_queue_mutex_);
 
-  // Computes constraints for a node and submap pair.
-  void ComputeConstraint(const NodeId& node_id, const SubmapId& submap_id,
-      bool search_for_local_constraint = false, bool search_for_global_constraint = false)
-      LOCKS_EXCLUDED(mutex_);
+  std::pair<bool, bool> CheckIfConstraintCanBeAdded(
+      const NodeId& node_id,
+      const SubmapId& submap_id) LOCKS_EXCLUDED(mutex_);
+
+  std::pair<std::vector<SubmapId>, std::vector<SubmapId>>
+      ComputeCandidatesForConstraints(const NodeId& node_id) LOCKS_EXCLUDED(mutex_);
+  std::pair<std::vector<NodeId>, std::vector<NodeId>>
+      ComputeCandidatesForConstraints(const SubmapId& submap_id) LOCKS_EXCLUDED(mutex_);
+
+  std::pair<std::vector<SubmapId>, std::vector<SubmapId>>
+      SelectCandidatesForConstraints(
+          const std::vector<SubmapId>& local_candidates,
+          const std::vector<SubmapId>& global_candidates) LOCKS_EXCLUDED(mutex_);
+  std::pair<std::vector<NodeId>, std::vector<NodeId>>
+      SelectCandidatesForConstraints(
+          const std::vector<NodeId>& local_candidates,
+          const std::vector<NodeId>& global_candidates) LOCKS_EXCLUDED(mutex_);
+
+  void MaybeAddConstraints(const NodeId& node_id,
+      const std::vector<SubmapId>& local_submap_ids,
+      const std::vector<SubmapId>& global_submap_ids) LOCKS_EXCLUDED(mutex_);
+  void MaybeAddConstraints(const SubmapId& submap_id,
+      const std::vector<NodeId>& local_node_ids,
+      const std::vector<NodeId>& global_node_ids) LOCKS_EXCLUDED(mutex_);
 
   // Handles a new work item.
   void AddWorkItem(const std::function<WorkItem::Result()>& work_item)
@@ -269,10 +289,6 @@ class PoseGraph3D : public PoseGraph {
   // considered later.
   std::unique_ptr<WorkQueue> work_queue_ GUARDED_BY(work_queue_mutex_);
 
-  // We globally localize a fraction of the nodes from each trajectory.
-  absl::flat_hash_map<int, std::unique_ptr<common::FixedRatioSampler>>
-      global_localization_samplers_ GUARDED_BY(mutex_);
-
   // Number of nodes added since last loop closure.
   int num_nodes_since_last_loop_closure_ GUARDED_BY(mutex_) = 0;
 
@@ -287,6 +303,11 @@ class PoseGraph3D : public PoseGraph {
   std::vector<std::unique_ptr<PoseGraphTrimmer>> trimmers_ GUARDED_BY(mutex_);
   std::set<int> pure_localization_trajectory_ids_ GUARDED_BY(mutex_);
   std::map<int, proto::LoopTrimmerOptions> loop_trimmer_options_ GUARDED_BY(mutex_);
+
+  double num_local_constraints_to_compute_ = 0.0;
+  double num_global_constraints_to_compute_ = 0.0;
+  std::set<SubmapId> submaps_used_for_local_constraints_;
+  std::set<SubmapId> submaps_used_for_global_constraints_;
 
   PoseGraphData data_ GUARDED_BY(mutex_);
 
