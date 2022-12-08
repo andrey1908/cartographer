@@ -362,56 +362,82 @@ PoseGraph3D::SelectCandidatesForConstraints(
     const std::vector<SubmapId>& global_candidates) {
   std::vector<SubmapId> submaps_for_local_constraints;
   auto local_candidate_it = local_candidates.begin();
-  for (; local_candidate_it != local_candidates.end(); ++local_candidate_it) {
-    if (submaps_used_for_local_constraints_.count(*local_candidate_it) == 0) {
-      break;
-    }
+  bool local_first_pass = true;
+  while (local_candidate_it != local_candidates.end() &&
+      submaps_used_for_local_constraints_.count(*local_candidate_it)) {
+    ++local_candidate_it;
   }
-  if (local_candidate_it == local_candidates.end()) {
-    submaps_used_for_local_constraints_.clear();
-    local_candidate_it = local_candidates.begin();
-  }
+  std::set<SubmapId> used_local_candidates;
   while (num_local_constraints_to_compute_ >= 1.0) {
+    if (local_first_pass) {
+      while (local_candidate_it != local_candidates.end() &&
+          submaps_used_for_local_constraints_.count(*local_candidate_it)) {
+        ++local_candidate_it;
+      }
+    } else {
+      while (local_candidate_it != local_candidates.end() &&
+          used_local_candidates.count(*local_candidate_it)) {
+        ++local_candidate_it;
+      }
+    }
     if (local_candidate_it == local_candidates.end()) {
-      num_local_constraints_to_compute_ = 1.0;
-      break;
+      if (local_first_pass) {
+        submaps_used_for_local_constraints_.clear();
+        local_candidate_it = local_candidates.begin();
+        local_first_pass = false;
+        continue;
+      } else {
+        CHECK(used_local_candidates.size() == local_candidates.size());
+        num_local_constraints_to_compute_ = 1.0;
+        break;
+      }
     }
     const SubmapId& submap_id = *local_candidate_it;
     submaps_for_local_constraints.emplace_back(submap_id);
     submaps_used_for_local_constraints_.emplace(submap_id);
+    used_local_candidates.emplace(submap_id);
     num_local_constraints_to_compute_ -= 1.0;
     ++local_candidate_it;
-    while (local_candidate_it != local_candidates.end() &&
-        submaps_used_for_local_constraints_.count(*local_candidate_it)) {
-      ++local_candidate_it;
-    }
   }
 
   std::vector<SubmapId> submaps_for_global_constraints;
   auto global_candidate_it = global_candidates.begin();
-  for (; global_candidate_it != global_candidates.end(); ++global_candidate_it) {
-    if (submaps_used_for_global_constraints_.count(*global_candidate_it) == 0) {
-      break;
-    }
+  bool global_first_pass = true;
+  while (global_candidate_it != global_candidates.end() &&
+      submaps_used_for_global_constraints_.count(*global_candidate_it)) {
+    ++global_candidate_it;
   }
-  if (global_candidate_it == global_candidates.end()) {
-    submaps_used_for_global_constraints_.clear();
-    global_candidate_it = global_candidates.begin();
-  }
+  std::set<SubmapId> used_global_candidates;
   while (num_global_constraints_to_compute_ >= 1.0) {
+    if (global_first_pass) {
+      while (global_candidate_it != global_candidates.end() &&
+          submaps_used_for_global_constraints_.count(*global_candidate_it)) {
+        ++global_candidate_it;
+      }
+    } else {
+      while (global_candidate_it != global_candidates.end() &&
+          used_global_candidates.count(*global_candidate_it)) {
+        ++global_candidate_it;
+      }
+    }
     if (global_candidate_it == global_candidates.end()) {
-      num_global_constraints_to_compute_ = 1.0;
-      break;
+      if (global_first_pass) {
+        submaps_used_for_global_constraints_.clear();
+        global_candidate_it = global_candidates.begin();
+        global_first_pass = false;
+        continue;
+      } else {
+        CHECK(used_global_candidates.size() == global_candidates.size());
+        num_global_constraints_to_compute_ = 1.0;
+        break;
+      }
     }
     const SubmapId& submap_id = *global_candidate_it;
     submaps_for_global_constraints.emplace_back(submap_id);
     submaps_used_for_global_constraints_.emplace(submap_id);
+    used_global_candidates.emplace(submap_id);
     num_global_constraints_to_compute_ -= 1.0;
     ++global_candidate_it;
-    while (global_candidate_it != global_candidates.end() &&
-        submaps_used_for_global_constraints_.count(*global_candidate_it)) {
-      ++global_candidate_it;
-    }
   }
 
   return std::make_pair(std::move(submaps_for_local_constraints),
@@ -583,6 +609,12 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
   std::tie(submaps_for_local_constraints, submaps_for_global_constraints) =
       SelectCandidatesForConstraints(submap_candidates_for_local_constraints,
           submap_candidates_for_global_constraints);
+  CHECK(std::set<SubmapId>(submaps_for_local_constraints.begin(),
+      submaps_for_local_constraints.end()).size() ==
+      submaps_for_local_constraints.size());
+  CHECK(std::set<SubmapId>(submaps_for_global_constraints.begin(),
+      submaps_for_global_constraints.end()).size() ==
+      submaps_for_global_constraints.size());
   MaybeAddConstraints(node_id, submaps_for_local_constraints, submaps_for_global_constraints);
 
   if (newly_finished_submap && !pure_localization_trajectory) {
@@ -605,6 +637,12 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
     std::tie(nodes_for_local_constraints, nodes_for_global_constraints) =
         SelectCandidatesForConstraints(node_candidates_for_local_constraints,
             node_candidates_for_global_constraints);
+    CHECK(std::set<NodeId>(nodes_for_local_constraints.begin(),
+        nodes_for_local_constraints.end()).size() ==
+        nodes_for_local_constraints.size());
+    CHECK(std::set<NodeId>(nodes_for_global_constraints.begin(),
+        nodes_for_global_constraints.end()).size() ==
+        nodes_for_global_constraints.size());
     MaybeAddConstraints(newly_finished_submap_id, nodes_for_local_constraints, nodes_for_global_constraints);
   }
 
