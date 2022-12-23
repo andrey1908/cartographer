@@ -110,7 +110,7 @@ void PoseGraph3D::DeleteTrajectoriesIfNeeded() {
 
 void PoseGraph3D::AddImuData(const int trajectory_id,
                              const sensor::ImuData& imu_data) {
-  AddWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([=]() {
     absl::MutexLock locker(&mutex_);
     if (CanAddWorkItemModifying(trajectory_id)) {
       optimization_problem_->AddImuData(trajectory_id, imu_data);
@@ -121,7 +121,7 @@ void PoseGraph3D::AddImuData(const int trajectory_id,
 
 void PoseGraph3D::AddOdometryData(const int trajectory_id,
                                   const sensor::OdometryData& odometry_data) {
-  AddWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([=]() {
     absl::MutexLock locker(&mutex_);
     if (CanAddWorkItemModifying(trajectory_id)) {
       optimization_problem_->AddOdometryData(trajectory_id, odometry_data);
@@ -133,7 +133,7 @@ void PoseGraph3D::AddOdometryData(const int trajectory_id,
 void PoseGraph3D::AddFixedFramePoseData(
     const int trajectory_id,
     const sensor::FixedFramePoseData& fixed_frame_pose_data) {
-  AddWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([=]() {
     absl::MutexLock locker(&mutex_);
     if (CanAddWorkItemModifying(trajectory_id)) {
       optimization_problem_->AddFixedFramePoseData(trajectory_id,
@@ -145,7 +145,7 @@ void PoseGraph3D::AddFixedFramePoseData(
 
 void PoseGraph3D::AddLandmarkData(int trajectory_id,
                                   const sensor::LandmarkData& landmark_data) {
-  AddWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([=]() {
     absl::MutexLock locker(&mutex_);
     if (CanAddWorkItemModifying(trajectory_id)) {
       for (const auto& observation : landmark_data.landmark_observations) {
@@ -657,7 +657,7 @@ NodeId PoseGraph3D::AddNode(
   // execute the lambda.
   const bool newly_finished_submap =
       insertion_submaps.front()->insertion_finished();
-  AddWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([=]() {
     return ComputeConstraintsForNode(node_id, insertion_submaps,
                                      newly_finished_submap);
   });
@@ -1076,13 +1076,13 @@ void PoseGraph3D::DrainWorkQueue() {
 
 void PoseGraph3D::RunFinalOptimization() {
   {
-    AddWorkItem([this]() LOCKS_EXCLUDED(mutex_) {
+    AddWorkItem([this]() {
       absl::MutexLock locker(&mutex_);
       optimization_problem_->SetMaxNumIterations(
           options_.max_num_final_iterations());
       return WorkItem::Result::kRunOptimization;
     });
-    AddWorkItem([this]() LOCKS_EXCLUDED(mutex_) {
+    AddWorkItem([this]() {
       absl::MutexLock locker(&mutex_);
       optimization_problem_->SetMaxNumIterations(
           options_.optimization_problem_options()
@@ -1122,10 +1122,9 @@ void PoseGraph3D::WaitForAllComputations() {
   // First wait for the work queue to drain so that it's safe to schedule
   // a WhenDone() callback.
   {
-    const auto predicate = [this]()
-                               EXCLUSIVE_LOCKS_REQUIRED(work_queue_mutex_) {
-                                 return work_queue_ == nullptr;
-                               };
+    const auto predicate = [this]() {
+      return work_queue_ == nullptr;
+    };
     absl::MutexLock locker(&work_queue_mutex_);
     while (!work_queue_mutex_.AwaitWithTimeout(
         absl::Condition(&predicate),
@@ -1139,14 +1138,13 @@ void PoseGraph3D::WaitForAllComputations() {
   bool notification = false;
   constraint_builder_.WhenDone(
       [this,
-       &notification](const constraints::ConstraintBuilder3D::Result& result)
-          LOCKS_EXCLUDED(mutex_) {
+       &notification](const constraints::ConstraintBuilder3D::Result& result) {
             absl::MutexLock locker(&mutex_);
             data_.constraints.insert(data_.constraints.end(), result.begin(),
                                      result.end());
             notification = true;
           });
-  const auto predicate = [&notification]() EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+  const auto predicate = [&notification]() {
     return notification;
   };
   while (!mutex_.AwaitWithTimeout(absl::Condition(&predicate),
@@ -1169,7 +1167,7 @@ void PoseGraph3D::DeleteTrajectory(const int trajectory_id) {
     it->second.deletion_state =
         InternalTrajectoryState::DeletionState::SCHEDULED_FOR_DELETION;
   }
-  AddWorkItem([this, trajectory_id]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, trajectory_id]() {
     absl::MutexLock locker(&mutex_);
     CHECK(data_.trajectories_state.at(trajectory_id).state !=
           TrajectoryState::ACTIVE);
@@ -1184,7 +1182,7 @@ void PoseGraph3D::DeleteTrajectory(const int trajectory_id) {
 }
 
 void PoseGraph3D::FinishTrajectory(const int trajectory_id) {
-  AddWorkItem([this, trajectory_id]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, trajectory_id]() {
     absl::MutexLock locker(&mutex_);
     CHECK(!IsTrajectoryFinished(trajectory_id));
     data_.trajectories_state[trajectory_id].state = TrajectoryState::FINISHED;
@@ -1207,7 +1205,7 @@ void PoseGraph3D::FreezeTrajectory(const int trajectory_id) {
     absl::MutexLock locker(&mutex_);
     data_.trajectory_connectivity_state.Add(trajectory_id);
   }
-  AddWorkItem([this, trajectory_id]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, trajectory_id]() {
     absl::MutexLock locker(&mutex_);
     CHECK(!IsTrajectoryFrozen(trajectory_id));
     // Connect multiple frozen trajectories among each other.
@@ -1267,7 +1265,7 @@ void PoseGraph3D::AddSubmapFromProto(
     kActiveSubmapsMetric->Increment();
   }
 
-  AddWorkItem([this, submap_id, global_submap_pose]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, submap_id, global_submap_pose]() {
     absl::MutexLock locker(&mutex_);
     data_.submap_data.at(submap_id).state = SubmapState::kFinished;
     optimization_problem_->InsertSubmap(submap_id, global_submap_pose);
@@ -1290,7 +1288,7 @@ void PoseGraph3D::AddNodeFromProto(const transform::Rigid3d& global_pose,
                                   TrajectoryNode{constant_data, global_pose});
   }
 
-  AddWorkItem([this, node_id, global_pose]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, node_id, global_pose]() {
     absl::MutexLock locker(&mutex_);
     const auto& constant_data =
         data_.trajectory_nodes.at(node_id).constant_data;
@@ -1315,7 +1313,7 @@ void PoseGraph3D::SetTrajectoryDataFromProto(
   }
 
   const int trajectory_id = data.trajectory_id();
-  AddWorkItem([this, trajectory_id, trajectory_data]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, trajectory_id, trajectory_data]() {
     absl::MutexLock locker(&mutex_);
     if (CanAddWorkItemModifying(trajectory_id)) {
       optimization_problem_->SetTrajectoryData(trajectory_id, trajectory_data);
@@ -1326,7 +1324,7 @@ void PoseGraph3D::SetTrajectoryDataFromProto(
 
 void PoseGraph3D::AddSerializedConstraints(
     const std::vector<Constraint>& constraints) {
-  AddWorkItem([this, constraints]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, constraints]() {
     absl::MutexLock locker(&mutex_);
     for (const auto& constraint : constraints) {
       CHECK(data_.trajectory_nodes.Contains(constraint.node_id));
@@ -1354,7 +1352,7 @@ void PoseGraph3D::AddSerializedConstraints(
 
 void PoseGraph3D::AddNodeToSubmap(const NodeId& node_id,
                                   const SubmapId& submap_id) {
-  AddWorkItem([this, node_id, submap_id]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, node_id, submap_id]() {
     absl::MutexLock locker(&mutex_);
     if (CanAddWorkItemModifying(submap_id.trajectory_id)) {
       data_.submap_data.at(submap_id).node_ids.insert(node_id);
@@ -1367,7 +1365,7 @@ void PoseGraph3D::AddNodeToSubmap(const NodeId& node_id,
 void PoseGraph3D::AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) {
   // C++11 does not allow us to move a unique_ptr into a lambda.
   PoseGraphTrimmer* const trimmer_ptr = trimmer.release();
-  AddWorkItem([this, trimmer_ptr]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, trimmer_ptr]() {
     absl::MutexLock locker(&mutex_);
     auto* pure_localization_trimmer_ptr = dynamic_cast<PureLocalizationTrimmer*>(trimmer_ptr);
     if (pure_localization_trimmer_ptr) {
@@ -1380,7 +1378,7 @@ void PoseGraph3D::AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) {
 
 void PoseGraph3D::AddLoopTrimmer(int trajectory_id,
     const proto::LoopTrimmerOptions& loop_trimmer_options) {
-  AddWorkItem([this, trajectory_id, loop_trimmer_options]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, trajectory_id, loop_trimmer_options]() {
     absl::MutexLock locker(&mutex_);
     loop_trimmer_options_.emplace(trajectory_id, loop_trimmer_options);
     return WorkItem::Result::kDoNotRunOptimization;
@@ -1592,7 +1590,7 @@ std::map<std::string, transform::Rigid3d> PoseGraph3D::GetLandmarkPoses()
 void PoseGraph3D::SetLandmarkPose(const std::string& landmark_id,
                                   const transform::Rigid3d& global_pose,
                                   const bool frozen) {
-  AddWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([=]() {
     absl::MutexLock locker(&mutex_);
     data_.landmark_nodes[landmark_id].global_landmark_pose = global_pose;
     data_.landmark_nodes[landmark_id].frozen = frozen;
