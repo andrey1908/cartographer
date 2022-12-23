@@ -177,15 +177,6 @@ void PoseGraph3D::AddWorkItem(
           .count());
 }
 
-void PoseGraph3D::NotifyEndOfNode() {
-  constraint_builder_.NotifyEndOfNode();
-}
-
-void PoseGraph3D::IncNumTrajectoryNodes() {
-  absl::MutexLock locker(&mutex_);
-  ++data_.num_trajectory_nodes;
-}
-
 void PoseGraph3D::AddTrajectoryIfNeeded(const int trajectory_id) {
   data_.trajectories_state[trajectory_id];
   CHECK(data_.trajectories_state.at(trajectory_id).state !=
@@ -1032,7 +1023,7 @@ void PoseGraph3D::DrainWorkQueue() {
       });
 }
 
-void PoseGraph3D::WaitForAllComputations(bool quiet /* false */) {
+void PoseGraph3D::WaitForAllComputations() {
   int num_trajectory_nodes;
   {
     absl::MutexLock locker(&mutex_);
@@ -1043,9 +1034,9 @@ void PoseGraph3D::WaitForAllComputations(bool quiet /* false */) {
       constraint_builder_.GetNumFinishedNodes();
 
   auto report_progress = [this, num_trajectory_nodes,
-                          num_finished_nodes_at_start, quiet]() {
+                          num_finished_nodes_at_start]() {
     // Log progress on nodes only when we are actually processing nodes.
-    if (num_trajectory_nodes != num_finished_nodes_at_start && !quiet) {
+    if (num_trajectory_nodes != num_finished_nodes_at_start) {
       std::ostringstream progress_info;
       progress_info << "Optimizing: " << std::fixed << std::setprecision(1)
                     << 100. *
@@ -1092,9 +1083,7 @@ void PoseGraph3D::WaitForAllComputations(bool quiet /* false */) {
     report_progress();
   }
   CHECK_EQ(constraint_builder_.GetNumFinishedNodes(), num_trajectory_nodes);
-  if (!quiet) {
-    std::cout << "\r\x1b[KOptimizing: Done.     " << std::endl;
-  }
+  std::cout << "\r\x1b[KOptimizing: Done.     " << std::endl;
 }
 
 void PoseGraph3D::DeleteTrajectory(const int trajectory_id) {

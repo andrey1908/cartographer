@@ -165,10 +165,15 @@ class PoseGraph3D : public PoseGraph {
 
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
 
+ protected:
   // Waits until we caught up (i.e. nothing is waiting to be scheduled), and
   // all computations have finished.
-  void WaitForAllComputations(bool quiet = false) LOCKS_EXCLUDED(mutex_)
+  void WaitForAllComputations() LOCKS_EXCLUDED(mutex_)
       LOCKS_EXCLUDED(work_queue_mutex_);
+
+ private:
+  MapById<SubmapId, SubmapData> GetSubmapDataUnderLock() const
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   std::pair<bool, bool> CheckIfConstraintCanBeAdded(
       const NodeId& node_id,
@@ -198,13 +203,6 @@ class PoseGraph3D : public PoseGraph {
   // Handles a new work item.
   void AddWorkItem(const std::function<WorkItem::Result()>& work_item)
       LOCKS_EXCLUDED(mutex_) LOCKS_EXCLUDED(work_queue_mutex_);
-
-  void NotifyEndOfNode();
-  void IncNumTrajectoryNodes();
-
- private:
-  MapById<SubmapId, SubmapData> GetSubmapDataUnderLock() const
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Adds connectivity and sampler for a trajectory if it does not exist.
   void AddTrajectoryIfNeeded(int trajectory_id)
