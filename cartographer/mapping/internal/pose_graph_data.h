@@ -31,10 +31,6 @@
 namespace cartographer {
 namespace mapping {
 
-// The current state of the submap in the background threads. After this
-// transitions to 'kFinished', all nodes are tried to match
-// against this submap. Likewise, all new nodes are matched against submaps in
-// that state.
 enum class SubmapState { kNoConstraintSearch, kFinished };
 
 struct InternalTrajectoryState {
@@ -52,38 +48,23 @@ struct InternalTrajectoryState {
 struct InternalSubmapData {
   std::shared_ptr<const Submap> submap;
   SubmapState state = SubmapState::kNoConstraintSearch;
-
-  // IDs of the nodes that were inserted into this map together with
-  // constraints for them. They are not to be matched again when this submap
-  // becomes 'kFinished'.
   std::set<NodeId> node_ids;
 };
 
 struct PoseGraphData {
-  // Submaps get assigned an ID and state as soon as they are seen, even
-  // before they take part in the background computations.
-  //// Does not contain global submap poses.
   MapById<SubmapId, InternalSubmapData> submap_data;
 
-  // Global submap poses currently used for displaying data.
-  //// Global submap poses after optimization.
   MapById<SubmapId, optimization::SubmapSpec2D> global_submap_poses_2d;
   MapById<SubmapId, optimization::SubmapSpec3D> global_submap_poses_3d;
 
-  // Data that are currently being shown.
-  //// Global node poses are computed using global pose of the last optimized submap and corrected after optimization.
   MapById<NodeId, TrajectoryNode> trajectory_nodes;
 
-  // Global landmark poses with all observations.
-  std::map<std::string /* landmark ID */, PoseGraphInterface::LandmarkNode>
-      landmark_nodes;
+  std::map<std::string, PoseGraphInterface::LandmarkNode> landmark_nodes;
 
-  // How our various trajectories are related.
   TrajectoryConnectivityState trajectory_connectivity_state;
   int num_trajectory_nodes = 0;
   std::map<int, InternalTrajectoryState> trajectories_state;
 
-  // Set of all initial trajectory poses.
   std::map<int, PoseGraph::InitialTrajectoryPose> initial_trajectory_poses;
 
   std::vector<PoseGraphInterface::Constraint> constraints;
