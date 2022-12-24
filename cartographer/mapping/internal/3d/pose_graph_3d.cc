@@ -963,57 +963,6 @@ void PoseGraph3D::HandleWorkQueue(
   DrainWorkQueue();
 }
 
-void PoseGraph3D::RunOptimization() {
-  if (optimization_problem_->submap_data().empty()) {
-    return;
-  }
-
-  // No other thread is accessing the optimization_problem_, data_.constraints,
-  // data_.frozen_trajectories and data_.landmark_nodes when executing the
-  // Solve. Solve is time consuming, so not taking the mutex before Solve to
-  // avoid blocking foreground processing.
-  optimization_problem_->Solve(data_.constraints, GetTrajectoryStates(),
-                               data_.landmark_nodes);
-  absl::MutexLock locker(&mutex_);
-
-  const auto& submap_data = optimization_problem_->submap_data();
-  const auto& node_data = optimization_problem_->node_data();
-  for (const int trajectory_id : node_data.trajectory_ids()) {
-    for (const auto& node : node_data.trajectory(trajectory_id)) {
-      data_.trajectory_nodes.at(node.id).global_pose = node.data.global_pose;
-    }
-
-    // Extrapolate all point cloud poses that were not included in the
-    // 'optimization_problem_' yet.
-    const auto local_to_new_global =
-        ComputeLocalToGlobalTransform(submap_data, trajectory_id);
-    const auto local_to_old_global = ComputeLocalToGlobalTransform(
-        data_.global_submap_poses_3d, trajectory_id);
-    const transform::Rigid3d old_global_to_new_global =
-        local_to_new_global * local_to_old_global.inverse();
-
-    const NodeId last_optimized_node_id =
-        std::prev(node_data.EndOfTrajectory(trajectory_id))->id;
-    auto node_it =
-        std::next(data_.trajectory_nodes.find(last_optimized_node_id));
-    for (; node_it != data_.trajectory_nodes.EndOfTrajectory(trajectory_id);
-         ++node_it) {
-      auto& mutable_trajectory_node = data_.trajectory_nodes.at(node_it->id);
-      mutable_trajectory_node.global_pose =
-          old_global_to_new_global * mutable_trajectory_node.global_pose;
-    }
-  }
-  for (const auto& landmark : optimization_problem_->landmark_data()) {
-    data_.landmark_nodes[landmark.first].global_landmark_pose = landmark.second;
-  }
-  data_.global_submap_poses_3d = submap_data;
-
-  // Log the histograms for the pose residuals.
-  if (options_.log_residual_histograms()) {
-    LogResidualHistograms();
-  }
-}
-
 void PoseGraph3D::DrainWorkQueue() {
   bool process_work_queue = true;
   size_t work_queue_size;
@@ -1072,6 +1021,57 @@ void PoseGraph3D::DrainWorkQueue() {
       [this](const constraints::ConstraintBuilder3D::Result& result) {
         HandleWorkQueue(result);
       });
+}
+
+void PoseGraph3D::RunOptimization() {
+  if (optimization_problem_->submap_data().empty()) {
+    return;
+  }
+
+  // No other thread is accessing the optimization_problem_, data_.constraints,
+  // data_.frozen_trajectories and data_.landmark_nodes when executing the
+  // Solve. Solve is time consuming, so not taking the mutex before Solve to
+  // avoid blocking foreground processing.
+  optimization_problem_->Solve(data_.constraints, GetTrajectoryStates(),
+                               data_.landmark_nodes);
+  absl::MutexLock locker(&mutex_);
+
+  const auto& submap_data = optimization_problem_->submap_data();
+  const auto& node_data = optimization_problem_->node_data();
+  for (const int trajectory_id : node_data.trajectory_ids()) {
+    for (const auto& node : node_data.trajectory(trajectory_id)) {
+      data_.trajectory_nodes.at(node.id).global_pose = node.data.global_pose;
+    }
+
+    // Extrapolate all point cloud poses that were not included in the
+    // 'optimization_problem_' yet.
+    const auto local_to_new_global =
+        ComputeLocalToGlobalTransform(submap_data, trajectory_id);
+    const auto local_to_old_global = ComputeLocalToGlobalTransform(
+        data_.global_submap_poses_3d, trajectory_id);
+    const transform::Rigid3d old_global_to_new_global =
+        local_to_new_global * local_to_old_global.inverse();
+
+    const NodeId last_optimized_node_id =
+        std::prev(node_data.EndOfTrajectory(trajectory_id))->id;
+    auto node_it =
+        std::next(data_.trajectory_nodes.find(last_optimized_node_id));
+    for (; node_it != data_.trajectory_nodes.EndOfTrajectory(trajectory_id);
+         ++node_it) {
+      auto& mutable_trajectory_node = data_.trajectory_nodes.at(node_it->id);
+      mutable_trajectory_node.global_pose =
+          old_global_to_new_global * mutable_trajectory_node.global_pose;
+    }
+  }
+  for (const auto& landmark : optimization_problem_->landmark_data()) {
+    data_.landmark_nodes[landmark.first].global_landmark_pose = landmark.second;
+  }
+  data_.global_submap_poses_3d = submap_data;
+
+  // Log the histograms for the pose residuals.
+  if (options_.log_residual_histograms()) {
+    LogResidualHistograms();
+  }
 }
 
 void PoseGraph3D::RunFinalOptimization() {

@@ -159,16 +159,16 @@ class PoseGraph3D : public PoseGraph {
 
  private:
   void AddWorkItem(const std::function<WorkItem::Result()>& work_item);
-  void DrainWorkQueue();
   void HandleWorkQueue(const constraints::ConstraintBuilder3D::Result& result);
+  void DrainWorkQueue();
+
+  void RunOptimization();
 
   std::vector<PoseGraphInterface::Constraint> TrimFalseDetectedLoops(
       const std::vector<PoseGraphInterface::Constraint>& new_loops);
   void TrimLoopsInWindow();
   std::vector<PoseGraphInterface::Constraint> TrimLoops(
       const std::vector<PoseGraphInterface::Constraint>& new_loops);
-
-  void RunOptimization();
 
   std::pair<bool, bool> CheckIfConstraintCanBeAdded(
       const NodeId& node_id,
