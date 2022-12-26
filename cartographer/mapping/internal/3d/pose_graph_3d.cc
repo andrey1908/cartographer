@@ -1429,14 +1429,15 @@ void PoseGraph3D::AddNodeToSubmap(
 }
 
 void PoseGraph3D::AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) {
-  // C++11 does not allow us to move a unique_ptr into a lambda.
   PoseGraphTrimmer* const trimmer_ptr = trimmer.release();
   AddWorkItem([this, trimmer_ptr]()
         LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
-    auto* pure_localization_trimmer_ptr = dynamic_cast<PureLocalizationTrimmer*>(trimmer_ptr);
+    auto* pure_localization_trimmer_ptr =
+        dynamic_cast<PureLocalizationTrimmer*>(trimmer_ptr);
     if (pure_localization_trimmer_ptr) {
-      pure_localization_trajectory_ids_.insert(pure_localization_trimmer_ptr->trajectory_id());
+      pure_localization_trajectory_ids_.insert(
+          pure_localization_trimmer_ptr->trajectory_id());
     }
     trimmers_.emplace_back(trimmer_ptr);
     return WorkItem::Result::kDoNotRunOptimization;
