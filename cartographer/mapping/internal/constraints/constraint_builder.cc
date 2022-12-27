@@ -36,7 +36,6 @@ proto::ConstraintBuilderOptions CreateConstraintBuilderOptions(
       parameter_dictionary->GetDouble("loop_closure_translation_weight"));
   options.set_loop_closure_rotation_weight(
       parameter_dictionary->GetDouble("loop_closure_rotation_weight"));
-  options.set_log_constraints(parameter_dictionary->GetBool("log_constraints"));
   options.set_log_matches(parameter_dictionary->GetBool("log_matches"));
   *options.mutable_fast_correlative_scan_matcher_options() =
       scan_matching::CreateFastCorrelativeScanMatcherOptions2D(

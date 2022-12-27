@@ -37,9 +37,6 @@ message ConstraintBuilderOptions {
   // loop closure constraints.
   double loop_closure_rotation_weight = 14;
 
-  // Custom logging for constraints.
-  bool log_constraints = 3;
-
   // If enabled, logs information of loop-closing constraints for debugging.
   bool log_matches = 8;
 

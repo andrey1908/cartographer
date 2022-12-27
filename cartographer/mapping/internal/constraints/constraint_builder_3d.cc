@@ -280,21 +280,6 @@ void ConstraintBuilder3D::ComputeConstraint(
        options_.loop_closure_rotation_weight()},
       Constraint::INTER_SUBMAP, match_result->score});
 
-  if (options_.log_constraints()) {
-    absl::MutexLock locker(&mutex_);
-    std::ostringstream info;
-    if (match_full_submap) {
-      info << "Global. ";
-    }
-    CHECK(node_id_to_submap_ids_.count(node_id));
-    const auto& submap_ids = node_id_to_submap_ids_.at(node_id);
-    CHECK(submap_ids.size());
-    SubmapId submap_id_for_node(*submap_ids.rbegin());
-    info << "Node from " << submap_id_for_node <<
-      ", submap " << submap_id << ", score " << std::setprecision(3) << match_result->score;
-    LOG(INFO) << info.str();
-  }
-
   if (options_.log_matches()) {
     std::ostringstream info;
     info << "Node " << node_id << " with "
@@ -365,19 +350,6 @@ void ConstraintBuilder3D::DeleteScanMatcher(const SubmapId& submap_id) {
   }
   submap_scan_matchers_.erase(submap_id);
   kNumSubmapScanMatchersMetric->Set(submap_scan_matchers_.size());
-}
-
-void ConstraintBuilder3D::ConnectNodeWithSubmap(const NodeId& node_id, const SubmapId& submap_id) {
-  absl::MutexLock locker(&mutex_);
-  node_id_to_submap_ids_[node_id].emplace(submap_id);
-}
-
-void ConstraintBuilder3D::RemoveNodeFromSubmap(const NodeId& node_id, const SubmapId& submap_id) {
-  absl::MutexLock locker(&mutex_);
-  CHECK(node_id_to_submap_ids_.count(node_id));
-  auto& submap_ids = node_id_to_submap_ids_.at(node_id);
-  CHECK(submap_ids.count(submap_id));
-  submap_ids.erase(submap_id);
 }
 
 void ConstraintBuilder3D::RegisterMetrics(metrics::FamilyFactory* factory) {

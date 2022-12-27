@@ -155,9 +155,6 @@ public:
   void AddSerializedConstraints(
       const std::vector<Constraint>& constraints) override
           LOCKS_EXCLUDED(work_queue_mutex_);
-  void AddNodeToSubmap(
-      const NodeId& node_id, const SubmapId& submap_id) override
-          LOCKS_EXCLUDED(work_queue_mutex_);
 
   void AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) override
       LOCKS_EXCLUDED(work_queue_mutex_);

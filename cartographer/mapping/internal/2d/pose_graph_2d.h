@@ -110,8 +110,6 @@ class PoseGraph2D : public PoseGraph {
   void AddNodeFromProto(const transform::Rigid3d& global_pose,
                         const proto::Node& node) override;
   void SetTrajectoryDataFromProto(const proto::TrajectoryData& data) override;
-  void AddNodeToSubmap(const NodeId& node_id,
-                       const SubmapId& submap_id) override;
   void AddSerializedConstraints(
       const std::vector<Constraint>& constraints) override;
   void AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) override;

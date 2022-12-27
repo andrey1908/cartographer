@@ -552,7 +552,7 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
       CHECK(data_.submap_data.at(submap_id).state ==
             SubmapState::kNoConstraintSearch);
       data_.submap_data.at(submap_id).node_ids.emplace(node_id);
-      constraint_builder_.ConnectNodeWithSubmap(node_id, submap_id);
+      data_.trajectory_nodes.at(node_id).submap_ids.emplace_back(submap_id);
       const transform::Rigid3d constraint_transform =
           insertion_submaps[i]->local_pose().inverse() * local_pose;
       data_.constraints.push_back(Constraint{
@@ -643,6 +643,7 @@ NodeId PoseGraph3D::AppendNode(
   }
   const NodeId node_id = data_.trajectory_nodes.Append(
       trajectory_id, TrajectoryNode{constant_data, optimized_pose});
+  data_.trajectory_nodes.at(node_id).submap_ids.reserve(2);
   ++data_.num_trajectory_nodes;
   // Test if the 'insertion_submap.back()' is one we never saw before.
   if (data_.submap_data.SizeOfTrajectoryOrZero(trajectory_id) == 0 ||
@@ -903,6 +904,26 @@ PoseGraph3D::TrimLoops(const std::vector<PoseGraphInterface::Constraint>& new_lo
 void PoseGraph3D::HandleWorkQueue(
     const constraints::ConstraintBuilder3D::Result& result) {
   absl::MutexLock queue_locker(&executing_work_item_mutex_);
+  if (options_.log_constraints()) {
+    for (const Constraint& constraint : result) {
+      bool local, global;
+      std::tie(local, global) =
+          CheckIfConstraintCanBeAdded(constraint.node_id, constraint.submap_id);
+      CHECK(local != global);
+      std::ostringstream info;
+      if (global) {
+        info << "Global. ";
+      }
+      absl::MutexLock locker(&mutex_);
+      CHECK(data_.trajectory_nodes.at(constraint.node_id).submap_ids.size());
+      SubmapId submap_id_for_node(
+          data_.trajectory_nodes.at(constraint.node_id).submap_ids.back());
+      info << "Node from " << submap_id_for_node <<
+          ", submap " << constraint.submap_id <<
+          ", score " << std::setprecision(3) << constraint.score;
+      LOG(INFO) << info.str();
+    }
+  }
   constraints::ConstraintBuilder3D::Result true_detected_loops = TrimLoops(result);
   {
     absl::MutexLock locker(&mutex_);
@@ -1324,7 +1345,8 @@ void PoseGraph3D::AddNodeFromProto(
     AddTrajectoryIfNeeded(node_id.trajectory_id);
     if (!CanAddWorkItemModifying(node_id.trajectory_id)) return;
     data_.trajectory_nodes.Insert(node_id,
-                                  TrajectoryNode{constant_data, global_pose});
+        TrajectoryNode{constant_data, global_pose});
+    data_.trajectory_nodes.at(node_id).submap_ids.reserve(2);
   }
 
   AddWorkItem([this, node_id, global_pose]()
@@ -1336,8 +1358,8 @@ void PoseGraph3D::AddNodeFromProto(
         data_.trajectory_nodes.at(node_id).constant_data;
     optimization_problem_->InsertTrajectoryNode(
         node_id,
-        optimization::NodeSpec3D{constant_data->time, constant_data->local_pose,
-                                 global_pose});
+        optimization::NodeSpec3D{
+            constant_data->time, constant_data->local_pose, global_pose});
     return WorkItem::Result::kDoNotRunOptimization;
   });
 }
@@ -1397,10 +1419,15 @@ void PoseGraph3D::AddSerializedConstraints(
       CHECK(data_.submap_data.at(constraint.submap_id).submap != nullptr);
       switch (constraint.tag) {
         case Constraint::Tag::INTRA_SUBMAP:
-          CHECK(data_.submap_data.at(constraint.submap_id)
-                    .node_ids.emplace(constraint.node_id)
-                    .second);
-          constraint_builder_.ConnectNodeWithSubmap(constraint.node_id, constraint.submap_id);
+          {
+            bool added = data_.submap_data.at(constraint.submap_id)
+                .node_ids.emplace(constraint.node_id).second;
+            CHECK(added);
+            std::vector<SubmapId>& submap_ids_for_node =
+                data_.trajectory_nodes.at(constraint.node_id).submap_ids;
+            submap_ids_for_node.emplace_back(constraint.submap_id);
+            std::sort(submap_ids_for_node.begin(), submap_ids_for_node.end());
+          }
           break;
         case Constraint::Tag::INTER_SUBMAP:
           UpdateTrajectoryConnectivity(constraint);
@@ -1409,21 +1436,6 @@ void PoseGraph3D::AddSerializedConstraints(
       data_.constraints.push_back(constraint);
     }
     LOG(INFO) << "Loaded " << constraints.size() << " constraints.";
-    return WorkItem::Result::kDoNotRunOptimization;
-  });
-}
-
-void PoseGraph3D::AddNodeToSubmap(
-    const NodeId& node_id, const SubmapId& submap_id) {
-  AddWorkItem([this, node_id, submap_id]()
-        LOCKS_EXCLUDED(mutex_)
-        LOCKS_EXCLUDED(executing_work_item_mutex_) {
-    absl::MutexLock queue_locker(&executing_work_item_mutex_);
-    absl::MutexLock locker(&mutex_);
-    if (CanAddWorkItemModifying(submap_id.trajectory_id)) {
-      data_.submap_data.at(submap_id).node_ids.insert(node_id);
-      constraint_builder_.ConnectNodeWithSubmap(node_id, submap_id);
-    }
     return WorkItem::Result::kDoNotRunOptimization;
   });
 }
@@ -1812,7 +1824,12 @@ void PoseGraph3D::TrimmingHandle::TrimSubmap(const SubmapId& submap_id) {
         SubmapState::kFinished);
 
   for (const NodeId& node_id : parent_->data_.submap_data.at(submap_id).node_ids) {
-    parent_->constraint_builder_.RemoveNodeFromSubmap(node_id, submap_id);
+    std::vector<SubmapId>& submap_ids_for_node =
+        parent_->data_.trajectory_nodes.at(node_id).submap_ids;
+    auto it = std::find(submap_ids_for_node.begin(),
+        submap_ids_for_node.end(), submap_id);
+    CHECK(it != submap_ids_for_node.end());
+    submap_ids_for_node.erase(it);
   }
 
   // Compile all nodes that are still INTRA_SUBMAP constrained to other submaps

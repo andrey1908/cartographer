@@ -326,7 +326,7 @@ WorkItem::Result PoseGraph2D::ComputeConstraintsForNode(
       CHECK(data_.submap_data.at(submap_id).state ==
             SubmapState::kNoConstraintSearch);
       data_.submap_data.at(submap_id).node_ids.emplace(node_id);
-      constraint_builder_.ConnectNodeWithSubmap(node_id, submap_id);
+      data_.trajectory_nodes.at(node_id).submap_ids.emplace_back(submap_id);
       const transform::Rigid2d constraint_transform =
           constraints::ComputeSubmapPose(*insertion_submaps[i]).inverse() *
           local_pose_2d;
@@ -808,18 +808,6 @@ void PoseGraph2D::SetTrajectoryDataFromProto(
   }
 }
 
-void PoseGraph2D::AddNodeToSubmap(const NodeId& node_id,
-                                  const SubmapId& submap_id) {
-  AddWorkItem([this, node_id, submap_id]() LOCKS_EXCLUDED(mutex_) {
-    absl::MutexLock locker(&mutex_);
-    if (CanAddWorkItemModifying(submap_id.trajectory_id)) {
-      data_.submap_data.at(submap_id).node_ids.insert(node_id);
-      constraint_builder_.ConnectNodeWithSubmap(node_id, submap_id);
-    }
-    return WorkItem::Result::kDoNotRunOptimization;
-  });
-}
-
 void PoseGraph2D::AddSerializedConstraints(
     const std::vector<Constraint>& constraints) {
   AddWorkItem([this, constraints]() LOCKS_EXCLUDED(mutex_) {
@@ -832,10 +820,15 @@ void PoseGraph2D::AddSerializedConstraints(
       CHECK(data_.submap_data.at(constraint.submap_id).submap != nullptr);
       switch (constraint.tag) {
         case Constraint::Tag::INTRA_SUBMAP:
-          CHECK(data_.submap_data.at(constraint.submap_id)
-                    .node_ids.emplace(constraint.node_id)
-                    .second);
-          constraint_builder_.ConnectNodeWithSubmap(constraint.node_id, constraint.submap_id);
+          {
+            bool added = data_.submap_data.at(constraint.submap_id)
+                .node_ids.emplace(constraint.node_id).second;
+            CHECK(added);
+            std::vector<SubmapId>& submap_ids_for_node =
+                data_.trajectory_nodes.at(constraint.node_id).submap_ids;
+            submap_ids_for_node.emplace_back(constraint.submap_id);
+            std::sort(submap_ids_for_node.begin(), submap_ids_for_node.end());
+          }
           break;
         case Constraint::Tag::INTER_SUBMAP:
           UpdateTrajectoryConnectivity(constraint);
@@ -1253,7 +1246,12 @@ void PoseGraph2D::TrimmingHandle::TrimSubmap(const SubmapId& submap_id) {
         SubmapState::kFinished);
 
   for (const NodeId& node_id : parent_->data_.submap_data.at(submap_id).node_ids) {
-    parent_->constraint_builder_.RemoveNodeFromSubmap(node_id, submap_id);
+    std::vector<SubmapId>& submap_ids_for_node =
+        parent_->data_.trajectory_nodes.at(node_id).submap_ids;
+    auto it = std::find(submap_ids_for_node.begin(),
+        submap_ids_for_node.end(), submap_id);
+    CHECK(it != submap_ids_for_node.end());
+    submap_ids_for_node.erase(it);
   }
 
   // Compile all nodes that are still INTRA_SUBMAP constrained to other submaps

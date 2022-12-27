@@ -106,11 +106,6 @@ class ConstraintBuilder2D {
   // Delete data related to 'submap_id'.
   void DeleteScanMatcher(const SubmapId& submap_id);
 
-  void ConnectNodeWithSubmap(const NodeId& node_id, const SubmapId& submap_id)
-      LOCKS_EXCLUDED(mutex_);
-  void RemoveNodeFromSubmap(const NodeId& node_id, const SubmapId& submap_id)
-      LOCKS_EXCLUDED(mutex_);
-
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
 
  private:
@@ -174,9 +169,6 @@ class ConstraintBuilder2D {
 
   // Histogram of scan matcher scores.
   common::Histogram score_histogram_ GUARDED_BY(mutex_);
-
-  // Match node with corresponding submap
-  std::map<NodeId, std::set<SubmapId>> node_id_to_submap_ids_ GUARDED_BY(mutex_);
 };
 
 }  // namespace constraints

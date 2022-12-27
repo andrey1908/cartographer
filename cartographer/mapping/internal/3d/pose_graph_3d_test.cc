@@ -338,8 +338,8 @@ TEST_F(PoseGraph3DTest, EvenSubmapTrimmerOnFrozenTrajectory) {
       auto node = testing::CreateFakeNode(trajectory_id, node_index);
       pose_graph_->AddNodeFromProto(Rigid3d::Identity(), node);
       // This step is normally done by a MapBuilder when loading frozen state.
-      pose_graph_->AddNodeToSubmap(NodeId{trajectory_id, node_index},
-                                   SubmapId{trajectory_id, submap_index});
+    //   pose_graph_->AddNodeToSubmap(NodeId{trajectory_id, node_index},
+    //                                SubmapId{trajectory_id, submap_index});
     }
   }
   pose_graph_->FreezeTrajectory(trajectory_id);
