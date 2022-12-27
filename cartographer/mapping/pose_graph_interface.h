@@ -51,7 +51,7 @@ class PoseGraphInterface {
     // into submap 'i').
     enum Tag { INTRA_SUBMAP, INTER_SUBMAP } tag;
 
-    float score;
+    float score;  // meaningful only for INTER_SUBMAP constraints
   };
 
   struct LandmarkNode {

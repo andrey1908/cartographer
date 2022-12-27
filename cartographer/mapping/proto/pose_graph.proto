@@ -49,6 +49,7 @@ message PoseGraph {
     // Weight of the rotational part of the constraint.
     double rotation_weight = 7;
     Tag tag = 5;
+    double score = 4;
   }
 
   message LandmarkPose {
