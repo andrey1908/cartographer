@@ -707,7 +707,6 @@ void PoseGraph3D::UpdateTrajectoryConnectivity(const Constraint& constraint) {
 
 std::vector<PoseGraphInterface::Constraint>
 PoseGraph3D::TrimFalseDetectedLoops(const std::vector<PoseGraphInterface::Constraint>& new_loops) {
-  MEASURE_BLOCK_TIME(trim_false_detected_loops);
   absl::MutexLock locker(&mutex_);
 
   int num_before = new_loops.size();
@@ -815,7 +814,6 @@ PoseGraph3D::TrimFalseDetectedLoops(const std::vector<PoseGraphInterface::Constr
 }
 
 void PoseGraph3D::TrimLoopsInWindow() {
-  MEASURE_BLOCK_TIME(trim_loops_in_window);
   absl::MutexLock locker(&mutex_);
   int num_before = 0;
   MapById<SubmapId, MapById<NodeId, float>> sorted_loops;
@@ -896,6 +894,7 @@ void PoseGraph3D::TrimLoopsInWindow() {
 
 std::vector<PoseGraphInterface::Constraint>
 PoseGraph3D::TrimLoops(const std::vector<PoseGraphInterface::Constraint>& new_loops) {
+  MEASURE_BLOCK_TIME(trim_loops);
   auto true_detected_loops = TrimFalseDetectedLoops(new_loops);
   TrimLoopsInWindow();
   return true_detected_loops;
