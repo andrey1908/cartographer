@@ -705,10 +705,94 @@ void PoseGraph3D::UpdateTrajectoryConnectivity(const Constraint& constraint) {
       time);
 }
 
+double PoseGraph3D::GetTravelledDistanceWithLoopsSameTrajectory(
+    NodeId node_1, NodeId node_2, float min_score) {
+  CHECK(node_1.trajectory_id == node_2.trajectory_id);
+  if (node_1 == node_2) {
+    return 0.0;
+  }
+  if (node_2 < node_1) {
+    std::swap(node_1, node_2);
+  }
+  double travelled_distance =
+      data_.trajectory_nodes.at(node_2).constant_data->travelled_distance -
+      data_.trajectory_nodes.at(node_1).constant_data->travelled_distance;
+  CHECK(travelled_distance >= 0.0);
+  for (const Constraint& loop : data_.constraints) {
+    if (loop.tag == Constraint::INTRA_SUBMAP) {
+      continue;
+    }
+    if (loop.score < min_score) {
+      continue;
+    }
+    if (loop.node_id.trajectory_id != loop.submap_id.trajectory_id ||
+        loop.node_id.trajectory_id != node_1.trajectory_id) {
+      continue;
+    }
+    NodeId loop_node_1 = loop.node_id;
+    NodeId loop_node_2 = *data_.submap_data.at(loop.submap_id).node_ids.begin();
+    if (loop_node_2 < loop_node_1) {
+      std::swap(loop_node_1, loop_node_2);
+    }
+    if (loop_node_2.node_index <= node_1.node_index ||
+        loop_node_1.node_index >= node_2.node_index) {
+      continue;
+    }
+    double travelled_distance_with_loop =
+        std::abs(
+            data_.trajectory_nodes.at(node_1).constant_data->travelled_distance -
+            data_.trajectory_nodes.at(loop_node_1).constant_data->travelled_distance) +
+        std::abs(
+            data_.trajectory_nodes.at(node_2).constant_data->travelled_distance -
+            data_.trajectory_nodes.at(loop_node_2).constant_data->travelled_distance);
+    travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
+  }
+  return travelled_distance;
+}
+
+double PoseGraph3D::GetTravelledDistanceWithLoopsDifferentTrajectories(
+    NodeId node_1, NodeId node_2, float min_score) {
+  CHECK(node_1.trajectory_id != node_2.trajectory_id);
+  if (node_2 < node_1) {
+    std::swap(node_1, node_2);
+  }
+  double travelled_distance = std::numeric_limits<double>::max();
+  for (const Constraint& loop : data_.constraints) {
+    if (loop.tag == Constraint::INTRA_SUBMAP) {
+      continue;
+    }
+    if (loop.score < min_score) {
+      continue;
+    }
+    if (std::minmax(loop.node_id.trajectory_id, loop.submap_id.trajectory_id) !=
+        std::minmax(node_1.trajectory_id, node_2.trajectory_id)) {
+      continue;
+    }
+    NodeId loop_node_1 = loop.node_id;
+    NodeId loop_node_2 = *data_.submap_data.at(loop.submap_id).node_ids.begin();
+    if (loop_node_2 < loop_node_1) {
+      std::swap(loop_node_1, loop_node_2);
+    }
+    double travelled_distance_with_loop =
+        GetTravelledDistanceWithLoopsSameTrajectory(node_1, loop_node_1, min_score) +
+        GetTravelledDistanceWithLoopsSameTrajectory(node_2, loop_node_2, min_score);
+    travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
+  }
+  return travelled_distance;
+}
+
+double PoseGraph3D::GetTravelledDistanceWithLoops(
+    NodeId node_1, NodeId node_2, float min_score) {
+  if (node_1.trajectory_id == node_2.trajectory_id) {
+    return GetTravelledDistanceWithLoopsSameTrajectory(node_1, node_2, min_score);
+  } else {
+    return GetTravelledDistanceWithLoopsDifferentTrajectories(node_1, node_2, min_score);
+  }
+}
+
 std::vector<PoseGraphInterface::Constraint>
 PoseGraph3D::TrimFalseDetectedLoops(const std::vector<PoseGraphInterface::Constraint>& new_loops) {
   absl::MutexLock locker(&mutex_);
-
   int num_before = new_loops.size();
   std::vector<PoseGraphInterface::Constraint> true_detected_loops;
   true_detected_loops.reserve(new_loops.size());
@@ -730,68 +814,11 @@ PoseGraph3D::TrimFalseDetectedLoops(const std::vector<PoseGraphInterface::Constr
       true_detected_loops.push_back(new_loop);
       continue;
     }
-    bool different_trajectories =
-        (new_loop.submap_id.trajectory_id != new_loop.node_id.trajectory_id);
-    const NodeId& new_loop_first_node_id_in_submap =
+    const NodeId& new_loop_node_1 = new_loop.node_id;
+    const NodeId& new_loop_node_2 =
         *data_.submap_data.at(new_loop.submap_id).node_ids.begin();
-    const NodeId& new_loop_node_id = new_loop.node_id;
-    double travelled_distance;
-    if (different_trajectories) {
-      travelled_distance = std::numeric_limits<double>::max();
-    } else {
-      travelled_distance = std::abs(
-          data_.trajectory_nodes.at(new_loop_first_node_id_in_submap).constant_data->travelled_distance -
-          data_.trajectory_nodes.at(new_loop_node_id).constant_data->travelled_distance);
-    }
-    for (const auto& loop : data_.constraints) {
-      if (loop.tag == Constraint::INTRA_SUBMAP) {
-        continue;
-      }
-      if (loop.score <= new_loop.score) {
-        continue;
-      }
-      const NodeId& loop_first_node_id_in_submap =
-          *data_.submap_data.at(loop.submap_id).node_ids.begin();
-      const NodeId& loop_node_id = loop.node_id;
-      bool crossed;
-      if (new_loop_first_node_id_in_submap.trajectory_id == loop_first_node_id_in_submap.trajectory_id &&
-          new_loop_node_id.trajectory_id == loop_node_id.trajectory_id) {
-        if (!different_trajectories) {
-          if ((new_loop_first_node_id_in_submap.node_index < new_loop_node_id.node_index) ==
-              (loop_first_node_id_in_submap.node_index < loop_node_id.node_index)) {
-            crossed = false;
-          } else {
-            crossed = true;
-          }
-        } else {
-          crossed = false;
-        }
-      } else if (new_loop_first_node_id_in_submap.trajectory_id == loop_node_id.trajectory_id &&
-                 new_loop_node_id.trajectory_id == loop_first_node_id_in_submap.trajectory_id) {
-        crossed = true;
-      } else {
-        continue;
-      }
-      double travelled_distance_with_loop;
-      if (crossed) {
-        travelled_distance_with_loop =
-        std::abs(
-            data_.trajectory_nodes.at(new_loop_first_node_id_in_submap).constant_data->travelled_distance -
-            data_.trajectory_nodes.at(loop_node_id).constant_data->travelled_distance) +
-        std::abs(
-            data_.trajectory_nodes.at(new_loop_node_id).constant_data->travelled_distance -
-            data_.trajectory_nodes.at(loop_first_node_id_in_submap).constant_data->travelled_distance);
-      } else {
-        travelled_distance_with_loop =
-        std::abs(
-            data_.trajectory_nodes.at(new_loop_first_node_id_in_submap).constant_data->travelled_distance -
-            data_.trajectory_nodes.at(loop_first_node_id_in_submap).constant_data->travelled_distance) +
-        std::abs(
-            data_.trajectory_nodes.at(new_loop_node_id).constant_data->travelled_distance -
-            data_.trajectory_nodes.at(loop_node_id).constant_data->travelled_distance);
-      }
-      travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
-    }
+    double travelled_distance =
+        GetTravelledDistanceWithLoops(new_loop_node_1, new_loop_node_2, new_loop.score);
     const transform::Rigid3d& global_submap_pose =
         data_.global_submap_poses_3d.at(new_loop.submap_id).global_pose;
     const transform::Rigid3d& global_node_pose =

@@ -238,6 +238,18 @@ private:
       LOCKS_EXCLUDED(mutex_)
       EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
 
+  double GetTravelledDistanceWithLoopsSameTrajectory(
+      NodeId node_1, NodeId node_2, float min_score)
+          EXCLUSIVE_LOCKS_REQUIRED(mutex_)
+          EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+  double GetTravelledDistanceWithLoopsDifferentTrajectories(
+      NodeId node_1, NodeId node_2, float min_score)
+          EXCLUSIVE_LOCKS_REQUIRED(mutex_)
+          EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+  double GetTravelledDistanceWithLoops(
+      NodeId node_1, NodeId node_2, float min_score)
+          EXCLUSIVE_LOCKS_REQUIRED(mutex_)
+          EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
   std::vector<PoseGraphInterface::Constraint> TrimFalseDetectedLoops(
       const std::vector<PoseGraphInterface::Constraint>& new_loops)
           LOCKS_EXCLUDED(mutex_)
