@@ -54,6 +54,14 @@ class PoseGraphInterface {
     float score;  // meaningful only for INTER_SUBMAP constraints
   };
 
+  struct TrimmedLoop {
+    SubmapId submap_id;
+    NodeId node_id;
+    float score;
+    double travelled_distance_for_submap;
+    double travelled_distance_for_node;
+  };
+
   struct LandmarkNode {
     struct LandmarkObservation {
       int trajectory_id;

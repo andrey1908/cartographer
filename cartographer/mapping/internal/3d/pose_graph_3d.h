@@ -375,6 +375,9 @@ private:
       GUARDED_BY(executing_work_item_mutex_);
   std::set<int> pure_localization_trajectory_ids_
       GUARDED_BY(executing_work_item_mutex_);
+  std::vector<TrimmedLoop> trimmed_loops_
+      GUARDED_BY(executing_work_item_mutex_);  // loops trimmed
+          // by TrimmingHandle::TrimSubmap()
   std::map<int, proto::LoopTrimmerOptions> loop_trimmer_options_
       GUARDED_BY(executing_work_item_mutex_);
 

@@ -778,6 +778,39 @@ double PoseGraph3D::GetTravelledDistanceWithLoopsDifferentTrajectories(
         GetTravelledDistanceWithLoopsSameTrajectory(node_2, loop_node_2, min_score);
     travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
   }
+  for (const TrimmedLoop& loop : trimmed_loops_) {
+    if (loop.score < min_score) {
+      continue;
+    }
+    if (std::minmax(loop.node_id.trajectory_id, loop.submap_id.trajectory_id) !=
+        std::minmax(node_1.trajectory_id, node_2.trajectory_id)) {
+      continue;
+    }
+    if (loop.submap_id.trajectory_id != node_1.trajectory_id) {
+      std::swap(node_1, node_2);
+    }
+    double travelled_distance_1, travelled_distance_2;
+    if (data_.submap_data.Contains(loop.submap_id)) {
+      const NodeId& loop_node_1 = *data_.submap_data.at(loop.submap_id).node_ids.begin();
+      travelled_distance_1 =
+          GetTravelledDistanceWithLoopsSameTrajectory(node_1, loop_node_1, min_score);
+    } else {
+      travelled_distance_1 = std::abs(
+          data_.trajectory_nodes.at(node_1).constant_data->travelled_distance -
+          loop.travelled_distance_for_submap);
+    }
+    if (data_.trajectory_nodes.Contains(loop.node_id)) {
+      travelled_distance_2 =
+          GetTravelledDistanceWithLoopsSameTrajectory(node_2, loop.node_id, min_score);
+    } else {
+      travelled_distance_2 = std::abs(
+          data_.trajectory_nodes.at(node_2).constant_data->travelled_distance -
+          loop.travelled_distance_for_node);
+    }
+    double travelled_distance_with_loop =
+        travelled_distance_1 + travelled_distance_2;
+    travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
+  }
   return travelled_distance;
 }
 
@@ -1883,6 +1916,18 @@ void PoseGraph3D::TrimmingHandle::TrimSubmap(const SubmapId& submap_id) {
     for (const Constraint& constraint : parent_->data_.constraints) {
       if (constraint.submap_id != submap_id) {
         constraints.push_back(constraint);
+      } else {
+        if (constraint.tag == Constraint::INTER_SUBMAP) {
+          const NodeId& first_node_id_for_submap =
+              *parent_->data_.submap_data.at(constraint.submap_id).node_ids.begin();
+          parent_->trimmed_loops_.push_back(
+              TrimmedLoop{constraint.submap_id, constraint.node_id,
+                  constraint.score,
+                  parent_->data_.trajectory_nodes.at(
+                      first_node_id_for_submap).constant_data->travelled_distance,
+                  parent_->data_.trajectory_nodes.at(
+                      constraint.node_id).constant_data->travelled_distance});
+        }
       }
     }
     parent_->data_.constraints = std::move(constraints);
@@ -1900,6 +1945,17 @@ void PoseGraph3D::TrimmingHandle::TrimSubmap(const SubmapId& submap_id) {
       } else {
         // A constraint to another submap will be removed, mark it as affected.
         other_submap_ids_losing_constraints.insert(constraint.submap_id);
+        if (constraint.tag == Constraint::INTER_SUBMAP) {
+          const NodeId& first_node_id_for_submap =
+              *parent_->data_.submap_data.at(constraint.submap_id).node_ids.begin();
+          parent_->trimmed_loops_.push_back(
+              TrimmedLoop{constraint.submap_id, constraint.node_id,
+                  constraint.score,
+                  parent_->data_.trajectory_nodes.at(
+                      first_node_id_for_submap).constant_data->travelled_distance,
+                  parent_->data_.trajectory_nodes.at(
+                      constraint.node_id).constant_data->travelled_distance});
+        }
       }
     }
     parent_->data_.constraints = std::move(constraints);
