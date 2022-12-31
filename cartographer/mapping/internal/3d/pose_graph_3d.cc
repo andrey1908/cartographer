@@ -996,7 +996,7 @@ void PoseGraph3D::HandleWorkQueue(
 
   {
     absl::MutexLock locker(&mutex_);
-    for (const Constraint& constraint : result) {
+    for (const Constraint& constraint : true_detected_loops) {
       UpdateTrajectoryConnectivity(constraint);
     }
     DeleteTrajectoriesIfNeeded();
