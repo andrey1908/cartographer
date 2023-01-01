@@ -573,6 +573,7 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
   bool pure_localization_trajectory =
       pure_localization_trajectory_ids_.count(node_id.trajectory_id);
 
+  MEASURE_TIME_FROM_HERE(schedule_constraints_computation_for_node);
   std::vector<SubmapId> submap_candidates_for_local_constraints;
   std::vector<SubmapId> submap_candidates_for_global_constraints;
   std::tie(submap_candidates_for_local_constraints, submap_candidates_for_global_constraints) =
@@ -591,8 +592,10 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
       submaps_for_global_constraints.end()).size() ==
       submaps_for_global_constraints.size());
   MaybeAddConstraints(node_id, submaps_for_local_constraints, submaps_for_global_constraints);
+  STOP_TIME_MEASUREMENT(schedule_constraints_computation_for_node);
 
   if (newly_finished_submap && !pure_localization_trajectory) {
+    MEASURE_TIME_FROM_HERE(schedule_constraints_computation_for_submap);
     const SubmapId newly_finished_submap_id = submap_ids.front();
     int newly_finished_submap_num_nodes;
     {
@@ -619,6 +622,7 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
         nodes_for_global_constraints.end()).size() ==
         nodes_for_global_constraints.size());
     MaybeAddConstraints(newly_finished_submap_id, nodes_for_local_constraints, nodes_for_global_constraints);
+    STOP_TIME_MEASUREMENT(schedule_constraints_computation_for_submap);
   }
 
   constraint_builder_.NotifyEndOfNode();
