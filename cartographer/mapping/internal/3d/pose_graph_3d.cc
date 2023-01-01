@@ -26,6 +26,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <random>
 
 #include "Eigen/Eigenvalues"
 #include "absl/memory/memory.h"
@@ -247,6 +248,8 @@ PoseGraph3D::ComputeCandidatesForConstraints(const NodeId& node_id) {
       global_candidates.emplace_back(submap_id);
     }
   }
+  std::shuffle(local_candidates.begin(), local_candidates.end(),
+      std::default_random_engine(123));
   return std::make_pair(std::move(local_candidates), std::move(global_candidates));
 }
 
