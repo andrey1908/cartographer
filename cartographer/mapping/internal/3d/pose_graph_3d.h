@@ -276,10 +276,22 @@ private:
           LOCKS_EXCLUDED(mutex_)
           EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
 
+  static std::vector<SubmapId>
+      SelectCandidatesForConstraints(
+          const std::vector<SubmapId>& candidates,
+          double& num_constraints_to_compute,
+          std::set<SubmapId>& submaps_used_for_constraints)
+              EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
   std::pair<std::vector<SubmapId>, std::vector<SubmapId>>
       SelectCandidatesForConstraints(
           const std::vector<SubmapId>& local_candidates,
           const std::vector<SubmapId>& global_candidates)
+              EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+
+  static std::vector<NodeId>
+      SelectCandidatesForConstraints(
+          const std::vector<NodeId>& candidates,
+          double& num_constraints_to_compute)
               EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
   std::pair<std::vector<NodeId>, std::vector<NodeId>>
       SelectCandidatesForConstraints(

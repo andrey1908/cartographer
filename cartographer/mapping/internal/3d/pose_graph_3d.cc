@@ -284,121 +284,104 @@ PoseGraph3D::ComputeCandidatesForConstraints(const SubmapId& submap_id) {
   return std::make_pair(std::move(local_candidates), std::move(global_candidates));
 }
 
+std::vector<SubmapId>
+PoseGraph3D::SelectCandidatesForConstraints(
+    const std::vector<SubmapId>& candidates,
+    double& num_constraints_to_compute,
+    std::set<SubmapId>& submaps_used_for_constraints) {
+  static std::mt19937 generator(123);
+
+  // sort candidates before performing std::set_difference
+  std::vector<SubmapId> candidates_sorted = candidates;
+  std::sort(candidates_sorted.begin(), candidates_sorted.end());
+
+  // remove used submaps from candidates
+  std::vector<SubmapId> available_submaps;
+  std::set_difference(
+      candidates_sorted.begin(), candidates_sorted.end(),
+      submaps_used_for_constraints.begin(), submaps_used_for_constraints.end(),
+      std::back_inserter(available_submaps));
+
+  // output submaps
+  std::vector<SubmapId> submaps_for_constraints;
+  bool used_all_available_submaps = false;
+  while (num_constraints_to_compute >= 1.0) {
+    if (available_submaps.size() == 0) {
+      if (used_all_available_submaps) {
+        // special case: we drew all the candidates
+        num_constraints_to_compute = 1.0;
+        CHECK(submaps_for_constraints.size() == candidates.size());
+        return submaps_for_constraints;
+      }
+      // special case: we drew all submaps that weren't in the used submaps list.
+      // Clear the used submaps list and draw submaps that were previously discarded.
+      std::sort(submaps_for_constraints.begin(), submaps_for_constraints.end());
+      std::set_difference(
+          candidates_sorted.begin(), candidates_sorted.end(),
+          submaps_for_constraints.begin(), submaps_for_constraints.end(),
+          std::back_inserter(available_submaps));
+      submaps_used_for_constraints.clear();
+      used_all_available_submaps = true;
+      continue;
+    }
+    // draw random submap
+    int i = generator() % available_submaps.size();
+    auto submap_it = available_submaps.begin() + i;
+    submaps_for_constraints.emplace_back(*submap_it);
+    submaps_used_for_constraints.emplace(*submap_it);
+    available_submaps.erase(submap_it);
+    num_constraints_to_compute -= 1.0;
+  }
+  return submaps_for_constraints;
+}
+
 std::pair<std::vector<SubmapId>, std::vector<SubmapId>>
 PoseGraph3D::SelectCandidatesForConstraints(
     const std::vector<SubmapId>& local_candidates,
     const std::vector<SubmapId>& global_candidates) {
-  std::vector<SubmapId> submaps_for_local_constraints;
-  auto local_candidate_it = local_candidates.begin();
-  bool local_first_pass = true;
-  while (local_candidate_it != local_candidates.end() &&
-      submaps_used_for_local_constraints_.count(*local_candidate_it)) {
-    ++local_candidate_it;
-  }
-  std::set<SubmapId> used_local_candidates;
-  while (num_local_constraints_to_compute_ >= 1.0) {
-    if (local_first_pass) {
-      while (local_candidate_it != local_candidates.end() &&
-          submaps_used_for_local_constraints_.count(*local_candidate_it)) {
-        ++local_candidate_it;
-      }
-    } else {
-      while (local_candidate_it != local_candidates.end() &&
-          used_local_candidates.count(*local_candidate_it)) {
-        ++local_candidate_it;
-      }
-    }
-    if (local_candidate_it == local_candidates.end()) {
-      if (local_first_pass) {
-        submaps_used_for_local_constraints_.clear();
-        local_candidate_it = local_candidates.begin();
-        local_first_pass = false;
-        continue;
-      } else {
-        CHECK(used_local_candidates.size() == local_candidates.size());
-        num_local_constraints_to_compute_ = 1.0;
-        break;
-      }
-    }
-    const SubmapId& submap_id = *local_candidate_it;
-    submaps_for_local_constraints.emplace_back(submap_id);
-    submaps_used_for_local_constraints_.emplace(submap_id);
-    used_local_candidates.emplace(submap_id);
-    num_local_constraints_to_compute_ -= 1.0;
-    ++local_candidate_it;
-  }
-
-  std::vector<SubmapId> submaps_for_global_constraints;
-  auto global_candidate_it = global_candidates.begin();
-  bool global_first_pass = true;
-  while (global_candidate_it != global_candidates.end() &&
-      submaps_used_for_global_constraints_.count(*global_candidate_it)) {
-    ++global_candidate_it;
-  }
-  std::set<SubmapId> used_global_candidates;
-  while (num_global_constraints_to_compute_ >= 1.0) {
-    if (global_first_pass) {
-      while (global_candidate_it != global_candidates.end() &&
-          submaps_used_for_global_constraints_.count(*global_candidate_it)) {
-        ++global_candidate_it;
-      }
-    } else {
-      while (global_candidate_it != global_candidates.end() &&
-          used_global_candidates.count(*global_candidate_it)) {
-        ++global_candidate_it;
-      }
-    }
-    if (global_candidate_it == global_candidates.end()) {
-      if (global_first_pass) {
-        submaps_used_for_global_constraints_.clear();
-        global_candidate_it = global_candidates.begin();
-        global_first_pass = false;
-        continue;
-      } else {
-        CHECK(used_global_candidates.size() == global_candidates.size());
-        num_global_constraints_to_compute_ = 1.0;
-        break;
-      }
-    }
-    const SubmapId& submap_id = *global_candidate_it;
-    submaps_for_global_constraints.emplace_back(submap_id);
-    submaps_used_for_global_constraints_.emplace(submap_id);
-    used_global_candidates.emplace(submap_id);
-    num_global_constraints_to_compute_ -= 1.0;
-    ++global_candidate_it;
-  }
-
-  return std::make_pair(std::move(submaps_for_local_constraints),
+  std::vector<SubmapId> submaps_for_local_constraints =
+      SelectCandidatesForConstraints(
+        local_candidates, num_local_constraints_to_compute_,
+        submaps_used_for_local_constraints_);
+  std::vector<SubmapId> submaps_for_global_constraints =
+      SelectCandidatesForConstraints(
+        global_candidates, num_global_constraints_to_compute_,
+        submaps_used_for_global_constraints_);
+  return std::make_pair(
+      std::move(submaps_for_local_constraints),
       std::move(submaps_for_global_constraints));
+}
+
+std::vector<NodeId>
+PoseGraph3D::SelectCandidatesForConstraints(
+    const std::vector<NodeId>& candidates,
+    double& num_constraints_to_compute) {
+  std::vector<NodeId> nodes_for_constraints;
+  int num_constraints_to_compute_int = std::floor(num_constraints_to_compute);
+  if (num_constraints_to_compute_int > (int)candidates.size()) {
+    num_constraints_to_compute_int = candidates.size();
+  }
+  // draw nodes with equal steps
+  for (int n = 0; n < num_constraints_to_compute_int; n++) {
+    int i = std::lround(1.0 * n / num_constraints_to_compute_int * candidates.size());
+    nodes_for_constraints.emplace_back(candidates[i]);
+  }
+  num_constraints_to_compute -= std::floor(num_constraints_to_compute);
+  return nodes_for_constraints;
 }
 
 std::pair<std::vector<NodeId>, std::vector<NodeId>>
 PoseGraph3D::SelectCandidatesForConstraints(
     const std::vector<NodeId>& local_candidates,
     const std::vector<NodeId>& global_candidates) {
-  std::vector<NodeId> nodes_for_local_constraints;
-  int num_local_constraints_to_compute = std::floor(num_local_constraints_to_compute_);
-  if (num_local_constraints_to_compute > local_candidates.size()) {
-    num_local_constraints_to_compute = local_candidates.size();
-  }
-  for (int n = 0; n < num_local_constraints_to_compute; n++) {
-    int i = std::lround(1.0 * n / num_local_constraints_to_compute * local_candidates.size());
-    nodes_for_local_constraints.emplace_back(local_candidates[i]);
-  }
-  num_local_constraints_to_compute_ -= std::floor(num_local_constraints_to_compute_);
-
-  std::vector<NodeId> nodes_for_global_constraints;
-  int num_global_constraints_to_compute = std::floor(num_global_constraints_to_compute_);
-  if (num_global_constraints_to_compute > global_candidates.size()) {
-    num_global_constraints_to_compute = global_candidates.size();
-  }
-  for (int n = 0; n < num_global_constraints_to_compute; n++) {
-    int i = std::lround(1.0 * n / num_global_constraints_to_compute * global_candidates.size());
-    nodes_for_global_constraints.emplace_back(global_candidates[i]);
-  }
-  num_global_constraints_to_compute_ -= std::floor(num_global_constraints_to_compute_);
-
-  return std::make_pair(std::move(nodes_for_local_constraints),
+  std::vector<NodeId> nodes_for_local_constraints =
+      SelectCandidatesForConstraints(
+          local_candidates, num_local_constraints_to_compute_);
+  std::vector<NodeId> nodes_for_global_constraints =
+      SelectCandidatesForConstraints(
+          global_candidates, num_global_constraints_to_compute_);
+  return std::make_pair(
+      std::move(nodes_for_local_constraints),
       std::move(nodes_for_global_constraints));
 }
 
