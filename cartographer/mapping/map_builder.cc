@@ -240,9 +240,11 @@ std::map<int, int> MapBuilder::LoadState(
       deserializer.all_trajectory_builder_options();
 
   std::map<int, int> trajectory_remapping;
+  int prev_trajectory_id = -1;
   for (int i = 0; i < pose_graph_proto.trajectory_size(); ++i) {
     auto& trajectory_proto = *pose_graph_proto.mutable_trajectory(i);
-    CHECK_EQ(trajectory_proto.trajectory_id(), i);
+    CHECK(trajectory_proto.trajectory_id() > prev_trajectory_id);
+    prev_trajectory_id = trajectory_proto.trajectory_id();
     const auto& options_with_sensor_ids_proto =
         all_builder_options_proto.options_with_sensor_ids(i);
     const int new_trajectory_id =
