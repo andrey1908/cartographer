@@ -57,18 +57,11 @@ void MaybeAddPureLocalizationTrimmer(
     const int trajectory_id,
     const proto::TrajectoryBuilderOptions& trajectory_options,
     PoseGraph* pose_graph) {
-  if (trajectory_options.pure_localization()) {
-    LOG(WARNING)
-        << "'TrajectoryBuilderOptions::pure_localization' field is deprecated. "
-           "Use 'TrajectoryBuilderOptions::pure_localization_trimmer' instead.";
-    pose_graph->AddTrimmer(absl::make_unique<PureLocalizationTrimmer>(
-        trajectory_id, 3 /* max_submaps_to_keep */));
-    return;
-  }
+  CHECK(trajectory_options.pure_localization() == false);
   if (trajectory_options.has_pure_localization_trimmer()) {
-    pose_graph->AddTrimmer(absl::make_unique<PureLocalizationTrimmer>(
+    pose_graph->AddPureLocalizationTrimmer(
         trajectory_id,
-        trajectory_options.pure_localization_trimmer().max_submaps_to_keep()));
+        trajectory_options.pure_localization_trimmer());
   }
 }
 

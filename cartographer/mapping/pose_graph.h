@@ -26,7 +26,6 @@
 #include "cartographer/common/lua_parameter_dictionary.h"
 #include "cartographer/mapping/id.h"
 #include "cartographer/mapping/pose_graph_interface.h"
-#include "cartographer/mapping/pose_graph_trimmer.h"
 #include "cartographer/mapping/proto/pose_graph.pb.h"
 #include "cartographer/mapping/proto/pose_graph_options.pb.h"
 #include "cartographer/mapping/proto/serialization.pb.h"
@@ -100,9 +99,9 @@ class PoseGraph : public PoseGraphInterface {
   virtual void AddSerializedConstraints(
       const std::vector<Constraint>& constraints) = 0;
 
-  // Adds a 'trimmer'. It will be used after all data added before it has been
-  // included in the pose graph.
-  virtual void AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) = 0;
+  // Add pure localization trimmer.
+  virtual void AddPureLocalizationTrimmer(int trajectory_id,
+      const proto::PureLocalizationTrimmerOptions& pure_localization_trimmer_options) = 0;
 
   // Adds a loop trimmer to remove loops after optimization.
   virtual void AddLoopTrimmer(int trajectory_id,

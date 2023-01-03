@@ -39,7 +39,6 @@
 #include "cartographer/mapping/internal/trajectory_connectivity_state.h"
 #include "cartographer/mapping/internal/work_queue.h"
 #include "cartographer/mapping/pose_graph.h"
-#include "cartographer/mapping/pose_graph_trimmer.h"
 #include "cartographer/mapping/value_conversion_tables.h"
 #include "cartographer/metrics/family_factory.h"
 #include "cartographer/sensor/fixed_frame_pose_data.h"
@@ -112,7 +111,6 @@ class PoseGraph2D : public PoseGraph {
   void SetTrajectoryDataFromProto(const proto::TrajectoryData& data) override;
   void AddSerializedConstraints(
       const std::vector<Constraint>& constraints) override;
-  void AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) override;
   void AddLoopTrimmer(int trajectory_id,
       const proto::LoopTrimmerOptions& loop_trimmer_options) override;
   void RunFinalOptimization() override;
@@ -229,6 +227,9 @@ class PoseGraph2D : public PoseGraph {
   bool CanAddWorkItemModifying(int trajectory_id)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
+  void AddPureLocalizationTrimmer(int trajectory_id,
+      const proto::PureLocalizationTrimmerOptions& pure_localization_trimmer_options) override {};
+
   // Computes the local to global map frame transform based on the given
   // 'global_submap_poses'.
   transform::Rigid3d ComputeLocalToGlobalTransform(
@@ -265,38 +266,9 @@ class PoseGraph2D : public PoseGraph {
   // Thread pool used for handling the work queue.
   common::ThreadPool* const thread_pool_;
 
-  // List of all trimmers to consult when optimizations finish.
-  std::vector<std::unique_ptr<PoseGraphTrimmer>> trimmers_ GUARDED_BY(mutex_);
-
   PoseGraphData data_ GUARDED_BY(mutex_);
 
   ValueConversionTables conversion_tables_;
-
-  // Allows querying and manipulating the pose graph by the 'trimmers_'. The
-  // 'mutex_' of the pose graph is held while this class is used.
-  class TrimmingHandle : public Trimmable {
-   public:
-    TrimmingHandle(PoseGraph2D* parent);
-    ~TrimmingHandle() override {}
-
-    int num_submaps(int trajectory_id) const override;
-    std::vector<SubmapId> GetSubmapIds(int trajectory_id) const override;
-    MapById<SubmapId, SubmapData> GetOptimizedSubmapData() const override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_);
-    const MapById<NodeId, TrajectoryNode>& GetTrajectoryNodes() const override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_);
-    const std::vector<Constraint>& GetConstraints() const override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_);
-    void TrimSubmap(const SubmapId& submap_id)
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_) override;
-    bool IsFinished(int trajectory_id) const override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_);
-    void SetTrajectoryState(int trajectory_id, TrajectoryState state) override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_);
-
-   private:
-    PoseGraph2D* const parent_;
-  };
 };
 
 }  // namespace mapping

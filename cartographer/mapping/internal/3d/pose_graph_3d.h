@@ -39,7 +39,6 @@
 #include "cartographer/mapping/internal/pose_graph_data.h"
 #include "cartographer/mapping/internal/work_queue.h"
 #include "cartographer/mapping/pose_graph.h"
-#include "cartographer/mapping/pose_graph_trimmer.h"
 #include "cartographer/metrics/family_factory.h"
 #include "cartographer/sensor/fixed_frame_pose_data.h"
 #include "cartographer/sensor/landmark_data.h"
@@ -53,40 +52,6 @@ namespace cartographer {
 namespace mapping {
 
 class PoseGraph3D : public PoseGraph {
-private:
-  class TrimmingHandle : public Trimmable {
-  public:
-    TrimmingHandle(PoseGraph3D* parent);
-    ~TrimmingHandle() override {}
-
-    int num_submaps(int trajectory_id) const override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->executing_work_item_mutex_);
-    std::vector<SubmapId> GetSubmapIds(int trajectory_id) const override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->executing_work_item_mutex_);
-    MapById<SubmapId, SubmapData> GetOptimizedSubmapData() const override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_)
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->executing_work_item_mutex_);
-    const MapById<NodeId, TrajectoryNode>& GetTrajectoryNodes() const override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_)
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->executing_work_item_mutex_);
-    const std::vector<Constraint>& GetConstraints() const override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_)
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->executing_work_item_mutex_);
-    void TrimSubmap(const SubmapId& submap_id) override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_)
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->executing_work_item_mutex_);
-    bool IsFinished(int trajectory_id) const override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_)
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->executing_work_item_mutex_);
-    void SetTrajectoryState(int trajectory_id, TrajectoryState state) override
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_)
-        EXCLUSIVE_LOCKS_REQUIRED(parent_->executing_work_item_mutex_);
-
-  private:
-    PoseGraph3D* const parent_;
-  };
-
-
 public:
   PoseGraph3D(
       const proto::PoseGraphOptions& options,
@@ -156,8 +121,9 @@ public:
       const std::vector<Constraint>& constraints) override
           LOCKS_EXCLUDED(work_queue_mutex_);
 
-  void AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) override
-      LOCKS_EXCLUDED(work_queue_mutex_);
+  void AddPureLocalizationTrimmer(int trajectory_id,
+      const proto::PureLocalizationTrimmerOptions& pure_localization_trimmer_options) override
+          LOCKS_EXCLUDED(work_queue_mutex_);
   void AddLoopTrimmer(
       int trajectory_id,
       const proto::LoopTrimmerOptions& loop_trimmer_options) override
@@ -235,6 +201,14 @@ private:
       LOCKS_EXCLUDED(executing_work_item_mutex_);
 
   void RunOptimization()
+      LOCKS_EXCLUDED(mutex_)
+      EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+
+  void TrimSubmap(const SubmapId& submap_id)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_)
+      EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+
+  void TrimPureLocalizationTrajectories()
       LOCKS_EXCLUDED(mutex_)
       EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
 
@@ -383,14 +357,14 @@ private:
 
   int num_nodes_since_last_loop_closure_ GUARDED_BY(executing_work_item_mutex_);
 
-  std::vector<std::unique_ptr<PoseGraphTrimmer>> trimmers_
+  std::map<int, proto::PureLocalizationTrimmerOptions> pure_localization_trimmer_options_
+      GUARDED_BY(executing_work_item_mutex_);
+  std::map<int, proto::LoopTrimmerOptions> loop_trimmer_options_
       GUARDED_BY(executing_work_item_mutex_);
   std::set<int> pure_localization_trajectory_ids_
       GUARDED_BY(executing_work_item_mutex_);
+  // loops trimmed by TrimmingHandle::TrimSubmap()
   std::vector<TrimmedLoop> trimmed_loops_
-      GUARDED_BY(executing_work_item_mutex_);  // loops trimmed
-          // by TrimmingHandle::TrimSubmap()
-  std::map<int, proto::LoopTrimmerOptions> loop_trimmer_options_
       GUARDED_BY(executing_work_item_mutex_);
 
   double num_local_constraints_to_compute_ GUARDED_BY(executing_work_item_mutex_);

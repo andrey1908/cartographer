@@ -31,7 +31,6 @@
 #include "Eigen/Eigenvalues"
 #include "absl/memory/memory.h"
 #include "cartographer/common/math.h"
-#include "cartographer/mapping/internal/2d/overlapping_submaps_trimmer_2d.h"
 #include "cartographer/mapping/proto/pose_graph/constraint_builder_options.pb.h"
 #include "cartographer/sensor/compressed_point_cloud.h"
 #include "cartographer/sensor/internal/voxel_filter.h"
@@ -58,13 +57,6 @@ PoseGraph2D::PoseGraph2D(
       constraint_builder_(options_.constraint_builder_options(), thread_pool),
       thread_pool_(thread_pool) {
   CHECK(false) << "2d pose graph is not supported";
-  if (options.has_overlapping_submaps_trimmer_2d()) {
-    const auto& trimmer_options = options.overlapping_submaps_trimmer_2d();
-    AddTrimmer(absl::make_unique<OverlappingSubmapsTrimmer2D>(
-        trimmer_options.fresh_submaps_count(),
-        trimmer_options.min_covered_area(),
-        trimmer_options.min_added_submaps_count()));
-  }
 }
 
 PoseGraph2D::~PoseGraph2D() {
@@ -408,20 +400,20 @@ void PoseGraph2D::UpdateTrajectoryConnectivity(const Constraint& constraint) {
 }
 
 void PoseGraph2D::DeleteTrajectoriesIfNeeded() {
-  TrimmingHandle trimming_handle(this);
-  for (auto& it : data_.trajectories_state) {
-    if (it.second.deletion_state ==
-        InternalTrajectoryState::DeletionState::WAIT_FOR_DELETION) {
-      // TODO(gaschler): Consider directly deleting from data_, which may be
-      // more complete.
-      auto submap_ids = trimming_handle.GetSubmapIds(it.first);
-      for (auto& submap_id : submap_ids) {
-        trimming_handle.TrimSubmap(submap_id);
-      }
-      it.second.state = TrajectoryState::DELETED;
-      it.second.deletion_state = InternalTrajectoryState::DeletionState::NORMAL;
-    }
-  }
+  // TrimmingHandle trimming_handle(this);
+  // for (auto& it : data_.trajectories_state) {
+  //   if (it.second.deletion_state ==
+  //       InternalTrajectoryState::DeletionState::WAIT_FOR_DELETION) {
+  //     // TODO(gaschler): Consider directly deleting from data_, which may be
+  //     // more complete.
+  //     auto submap_ids = trimming_handle.GetSubmapIds(it.first);
+  //     for (auto& submap_id : submap_ids) {
+  //       trimming_handle.TrimSubmap(submap_id);
+  //     }
+  //     it.second.state = TrajectoryState::DELETED;
+  //     it.second.deletion_state = InternalTrajectoryState::DeletionState::NORMAL;
+  //   }
+  // }
 }
 
 void PoseGraph2D::HandleWorkQueue(
@@ -447,16 +439,6 @@ void PoseGraph2D::HandleWorkQueue(
       UpdateTrajectoryConnectivity(constraint);
     }
     DeleteTrajectoriesIfNeeded();
-    TrimmingHandle trimming_handle(this);
-    for (auto& trimmer : trimmers_) {
-      trimmer->Trim(&trimming_handle);
-    }
-    trimmers_.erase(
-        std::remove_if(trimmers_.begin(), trimmers_.end(),
-                       [](std::unique_ptr<PoseGraphTrimmer>& trimmer) {
-                         return trimmer->IsFinished();
-                       }),
-        trimmers_.end());
 
     num_nodes_since_last_loop_closure_ = 0;
 
@@ -848,16 +830,6 @@ void PoseGraph2D::AddSerializedConstraints(
   });
 }
 
-void PoseGraph2D::AddTrimmer(std::unique_ptr<PoseGraphTrimmer> trimmer) {
-  // C++11 does not allow us to move a unique_ptr into a lambda.
-  PoseGraphTrimmer* const trimmer_ptr = trimmer.release();
-  AddWorkItem([this, trimmer_ptr]() LOCKS_EXCLUDED(mutex_) {
-    absl::MutexLock locker(&mutex_);
-    trimmers_.emplace_back(trimmer_ptr);
-    return WorkItem::Result::kDoNotRunOptimization;
-  });
-}
-
 void PoseGraph2D::AddLoopTrimmer(int trajectory_id,
     const proto::LoopTrimmerOptions& loop_trimmer_options) {
   CHECK(false) << "Not implemented";
@@ -1182,164 +1154,6 @@ PoseGraphInterface::SubmapData PoseGraph2D::GetSubmapDataUnderLock(
   return {submap, ComputeLocalToGlobalTransform(data_.global_submap_poses_2d,
                                                 submap_id.trajectory_id) *
                       submap->local_pose()};
-}
-
-PoseGraph2D::TrimmingHandle::TrimmingHandle(PoseGraph2D* const parent)
-    : parent_(parent) {}
-
-int PoseGraph2D::TrimmingHandle::num_submaps(const int trajectory_id) const {
-  const auto& submap_data = parent_->optimization_problem_->submap_data();
-  return submap_data.SizeOfTrajectoryOrZero(trajectory_id);
-}
-
-MapById<SubmapId, PoseGraphInterface::SubmapData>
-PoseGraph2D::TrimmingHandle::GetOptimizedSubmapData() const {
-  MapById<SubmapId, PoseGraphInterface::SubmapData> submaps;
-  for (const auto& submap_id_data : parent_->data_.submap_data) {
-    if (submap_id_data.data.state != SubmapState::kFinished ||
-        !parent_->data_.global_submap_poses_2d.Contains(submap_id_data.id)) {
-      continue;
-    }
-    submaps.Insert(
-        submap_id_data.id,
-        SubmapData{submap_id_data.data.submap,
-                   transform::Embed3D(parent_->data_.global_submap_poses_2d
-                                          .at(submap_id_data.id)
-                                          .global_pose)});
-  }
-  return submaps;
-}
-
-std::vector<SubmapId> PoseGraph2D::TrimmingHandle::GetSubmapIds(
-    int trajectory_id) const {
-  std::vector<SubmapId> submap_ids;
-  const auto& submap_data = parent_->optimization_problem_->submap_data();
-  for (const auto& it : submap_data.trajectory(trajectory_id)) {
-    submap_ids.push_back(it.id);
-  }
-  return submap_ids;
-}
-
-const MapById<NodeId, TrajectoryNode>&
-PoseGraph2D::TrimmingHandle::GetTrajectoryNodes() const {
-  return parent_->data_.trajectory_nodes;
-}
-
-const std::vector<PoseGraphInterface::Constraint>&
-PoseGraph2D::TrimmingHandle::GetConstraints() const {
-  return parent_->data_.constraints;
-}
-
-bool PoseGraph2D::TrimmingHandle::IsFinished(const int trajectory_id) const {
-  return parent_->IsTrajectoryFinished(trajectory_id);
-}
-
-void PoseGraph2D::TrimmingHandle::SetTrajectoryState(int trajectory_id,
-                                                     TrajectoryState state) {
-  parent_->data_.trajectories_state[trajectory_id].state = state;
-}
-
-void PoseGraph2D::TrimmingHandle::TrimSubmap(const SubmapId& submap_id) {
-  // TODO(hrapp): We have to make sure that the trajectory has been finished
-  // if we want to delete the last submaps.
-  CHECK(parent_->data_.submap_data.at(submap_id).state ==
-        SubmapState::kFinished);
-
-  for (const NodeId& node_id : parent_->data_.submap_data.at(submap_id).node_ids) {
-    std::vector<SubmapId>& submap_ids_for_node =
-        parent_->data_.trajectory_nodes.at(node_id).submap_ids;
-    auto it = std::find(submap_ids_for_node.begin(),
-        submap_ids_for_node.end(), submap_id);
-    CHECK(it != submap_ids_for_node.end());
-    submap_ids_for_node.erase(it);
-  }
-
-  // Compile all nodes that are still INTRA_SUBMAP constrained to other submaps
-  // once the submap with 'submap_id' is gone.
-  // We need to use node_ids instead of constraints here to be also compatible
-  // with frozen trajectories that don't have intra-constraints.
-  std::set<NodeId> nodes_to_retain;
-  for (const auto& submap_data : parent_->data_.submap_data) {
-    if (submap_data.id != submap_id) {
-      nodes_to_retain.insert(submap_data.data.node_ids.begin(),
-                             submap_data.data.node_ids.end());
-    }
-  }
-
-  // Remove all nodes that are exlusively associated to 'submap_id'.
-  std::set<NodeId> nodes_to_remove;
-  std::set_difference(parent_->data_.submap_data.at(submap_id).node_ids.begin(),
-                      parent_->data_.submap_data.at(submap_id).node_ids.end(),
-                      nodes_to_retain.begin(), nodes_to_retain.end(),
-                      std::inserter(nodes_to_remove, nodes_to_remove.begin()));
-
-  // Remove all 'data_.constraints' related to 'submap_id'.
-  {
-    std::vector<Constraint> constraints;
-    for (const Constraint& constraint : parent_->data_.constraints) {
-      if (constraint.submap_id != submap_id) {
-        constraints.push_back(constraint);
-      }
-    }
-    parent_->data_.constraints = std::move(constraints);
-  }
-
-  // Remove all 'data_.constraints' related to 'nodes_to_remove'.
-  // If the removal lets other submaps lose all their inter-submap constraints,
-  // delete their corresponding constraint submap matchers to save memory.
-  {
-    std::vector<Constraint> constraints;
-    std::set<SubmapId> other_submap_ids_losing_constraints;
-    for (const Constraint& constraint : parent_->data_.constraints) {
-      if (nodes_to_remove.count(constraint.node_id) == 0) {
-        constraints.push_back(constraint);
-      } else {
-        // A constraint to another submap will be removed, mark it as affected.
-        other_submap_ids_losing_constraints.insert(constraint.submap_id);
-      }
-    }
-    parent_->data_.constraints = std::move(constraints);
-    // Go through the remaining constraints to ensure we only delete scan
-    // matchers of other submaps that have no inter-submap constraints left.
-    for (const Constraint& constraint : parent_->data_.constraints) {
-      if (constraint.tag == Constraint::Tag::INTRA_SUBMAP) {
-        continue;
-      } else if (other_submap_ids_losing_constraints.count(
-                     constraint.submap_id)) {
-        // This submap still has inter-submap constraints - ignore it.
-        other_submap_ids_losing_constraints.erase(constraint.submap_id);
-      }
-    }
-    // Delete scan matchers of the submaps that lost all constraints.
-    // TODO(wohe): An improvement to this implementation would be to add the
-    // caching logic at the constraint builder which could keep around only
-    // recently used scan matchers.
-    for (const SubmapId& submap_id : other_submap_ids_losing_constraints) {
-      parent_->constraint_builder_.DeleteScanMatcher(submap_id);
-    }
-  }
-
-  // Mark the submap with 'submap_id' as trimmed and remove its data.
-  CHECK(parent_->data_.submap_data.at(submap_id).state ==
-        SubmapState::kFinished);
-  parent_->data_.submap_data.Trim(submap_id);
-  parent_->constraint_builder_.DeleteScanMatcher(submap_id);
-  parent_->optimization_problem_->TrimSubmap(submap_id);
-
-  // We have one submap less, update the gauge metrics.
-  kDeletedSubmapsMetric->Increment();
-  if (parent_->IsTrajectoryFrozen(submap_id.trajectory_id)) {
-    kFrozenSubmapsMetric->Decrement();
-  } else {
-    kActiveSubmapsMetric->Decrement();
-  }
-
-  // Remove the 'nodes_to_remove' from the pose graph and the optimization
-  // problem.
-  for (const NodeId& node_id : nodes_to_remove) {
-    parent_->data_.trajectory_nodes.Trim(node_id);
-    parent_->optimization_problem_->TrimTrajectoryNode(node_id);
-  }
 }
 
 MapById<SubmapId, PoseGraphInterface::SubmapData>
