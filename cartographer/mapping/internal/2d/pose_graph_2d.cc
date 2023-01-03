@@ -157,7 +157,7 @@ NodeId PoseGraph2D::AddNode(
   // execute the lambda.
   const bool newly_finished_submap =
       insertion_submaps.front()->insertion_finished();
-  AddWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([=]() ABSL_LOCKS_EXCLUDED(mutex_) {
     return ComputeConstraintsForNode(node_id, insertion_submaps,
                                      newly_finished_submap);
   });
@@ -195,7 +195,7 @@ void PoseGraph2D::AddTrajectoryIfNeeded(const int trajectory_id) {
 
 void PoseGraph2D::AddImuData(const int trajectory_id,
                              const sensor::ImuData& imu_data) {
-  AddWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([=]() ABSL_LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock locker(&mutex_);
     if (CanAddWorkItemModifying(trajectory_id)) {
       optimization_problem_->AddImuData(trajectory_id, imu_data);
@@ -206,7 +206,7 @@ void PoseGraph2D::AddImuData(const int trajectory_id,
 
 void PoseGraph2D::AddOdometryData(const int trajectory_id,
                                   const sensor::OdometryData& odometry_data) {
-  AddWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([=]() ABSL_LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock locker(&mutex_);
     if (CanAddWorkItemModifying(trajectory_id)) {
       optimization_problem_->AddOdometryData(trajectory_id, odometry_data);
@@ -218,7 +218,7 @@ void PoseGraph2D::AddOdometryData(const int trajectory_id,
 void PoseGraph2D::AddFixedFramePoseData(
     const int trajectory_id,
     const sensor::FixedFramePoseData& fixed_frame_pose_data) {
-  AddWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([=]() ABSL_LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock locker(&mutex_);
     if (CanAddWorkItemModifying(trajectory_id)) {
       optimization_problem_->AddFixedFramePoseData(trajectory_id,
@@ -230,7 +230,7 @@ void PoseGraph2D::AddFixedFramePoseData(
 
 void PoseGraph2D::AddLandmarkData(int trajectory_id,
                                   const sensor::LandmarkData& landmark_data) {
-  AddWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([=]() ABSL_LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock locker(&mutex_);
     if (CanAddWorkItemModifying(trajectory_id)) {
       for (const auto& observation : landmark_data.landmark_observations) {
@@ -579,7 +579,7 @@ void PoseGraph2D::WaitForAllComputations() {
   // a WhenDone() callback.
   {
     const auto predicate = [this]()
-                               EXCLUSIVE_LOCKS_REQUIRED(work_queue_mutex_) {
+                               ABSL_EXCLUSIVE_LOCKS_REQUIRED(work_queue_mutex_) {
                                  return work_queue_ == nullptr;
                                };
     absl::MutexLock locker(&work_queue_mutex_);
@@ -596,13 +596,13 @@ void PoseGraph2D::WaitForAllComputations() {
   constraint_builder_.WhenDone(
       [this,
        &notification](const constraints::ConstraintBuilder2D::Result& result)
-          LOCKS_EXCLUDED(mutex_) {
+          ABSL_LOCKS_EXCLUDED(mutex_) {
             absl::MutexLock locker(&mutex_);
             data_.constraints.insert(data_.constraints.end(), result.begin(),
                                      result.end());
             notification = true;
           });
-  const auto predicate = [&notification]() EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+  const auto predicate = [&notification]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     return notification;
   };
   while (!mutex_.AwaitWithTimeout(absl::Condition(&predicate),
@@ -625,7 +625,7 @@ void PoseGraph2D::DeleteTrajectory(const int trajectory_id) {
     it->second.deletion_state =
         InternalTrajectoryState::DeletionState::SCHEDULED_FOR_DELETION;
   }
-  AddWorkItem([this, trajectory_id]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, trajectory_id]() ABSL_LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock locker(&mutex_);
     CHECK(data_.trajectories_state.at(trajectory_id).state !=
           TrajectoryState::ACTIVE);
@@ -640,7 +640,7 @@ void PoseGraph2D::DeleteTrajectory(const int trajectory_id) {
 }
 
 void PoseGraph2D::FinishTrajectory(const int trajectory_id) {
-  AddWorkItem([this, trajectory_id]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, trajectory_id]() ABSL_LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock locker(&mutex_);
     CHECK(!IsTrajectoryFinished(trajectory_id));
     data_.trajectories_state[trajectory_id].state = TrajectoryState::FINISHED;
@@ -663,7 +663,7 @@ void PoseGraph2D::FreezeTrajectory(const int trajectory_id) {
     absl::MutexLock locker(&mutex_);
     data_.trajectory_connectivity_state.Add(trajectory_id);
   }
-  AddWorkItem([this, trajectory_id]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, trajectory_id]() ABSL_LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock locker(&mutex_);
     CHECK(!IsTrajectoryFrozen(trajectory_id));
     // Connect multiple frozen trajectories among each other.
@@ -727,7 +727,7 @@ void PoseGraph2D::AddSubmapFromProto(
   }
 
   AddWorkItem(
-      [this, submap_id, global_submap_pose_2d]() LOCKS_EXCLUDED(mutex_) {
+      [this, submap_id, global_submap_pose_2d]() ABSL_LOCKS_EXCLUDED(mutex_) {
         absl::MutexLock locker(&mutex_);
         data_.submap_data.at(submap_id).state = SubmapState::kFinished;
         optimization_problem_->InsertSubmap(submap_id, global_submap_pose_2d);
@@ -750,7 +750,7 @@ void PoseGraph2D::AddNodeFromProto(const transform::Rigid3d& global_pose,
                                   TrajectoryNode{constant_data, global_pose});
   }
 
-  AddWorkItem([this, node_id, global_pose]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, node_id, global_pose]() ABSL_LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock locker(&mutex_);
     const auto& constant_data =
         data_.trajectory_nodes.at(node_id).constant_data;
@@ -779,7 +779,7 @@ void PoseGraph2D::SetTrajectoryDataFromProto(
 
     const int trajectory_id = data.trajectory_id();
     AddWorkItem([this, trajectory_id, trajectory_data]()
-                    LOCKS_EXCLUDED(mutex_) {
+                    ABSL_LOCKS_EXCLUDED(mutex_) {
                       absl::MutexLock locker(&mutex_);
                       if (CanAddWorkItemModifying(trajectory_id)) {
                         optimization_problem_->SetTrajectoryData(
@@ -792,7 +792,7 @@ void PoseGraph2D::SetTrajectoryDataFromProto(
 
 void PoseGraph2D::AddSerializedConstraints(
     const std::vector<Constraint>& constraints) {
-  AddWorkItem([this, constraints]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([this, constraints]() ABSL_LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock locker(&mutex_);
     for (const auto& constraint : constraints) {
       CHECK(data_.trajectory_nodes.Contains(constraint.node_id));
@@ -837,13 +837,13 @@ void PoseGraph2D::AddLoopTrimmer(int trajectory_id,
 
 void PoseGraph2D::RunFinalOptimization() {
   {
-    AddWorkItem([this]() LOCKS_EXCLUDED(mutex_) {
+    AddWorkItem([this]() ABSL_LOCKS_EXCLUDED(mutex_) {
       absl::MutexLock locker(&mutex_);
       optimization_problem_->SetMaxNumIterations(
           options_.max_num_final_iterations());
       return WorkItem::Result::kRunOptimization;
     });
-    AddWorkItem([this]() LOCKS_EXCLUDED(mutex_) {
+    AddWorkItem([this]() ABSL_LOCKS_EXCLUDED(mutex_) {
       absl::MutexLock locker(&mutex_);
       optimization_problem_->SetMaxNumIterations(
           options_.optimization_problem_options()
@@ -982,7 +982,7 @@ std::map<std::string, transform::Rigid3d> PoseGraph2D::GetLandmarkPoses()
 void PoseGraph2D::SetLandmarkPose(const std::string& landmark_id,
                                   const transform::Rigid3d& global_pose,
                                   const bool frozen) {
-  AddWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+  AddWorkItem([=]() ABSL_LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock locker(&mutex_);
     data_.landmark_nodes[landmark_id].global_landmark_pose = global_pose;
     data_.landmark_nodes[landmark_id].frozen = frozen;
