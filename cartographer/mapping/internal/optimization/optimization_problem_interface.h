@@ -40,7 +40,6 @@ template <typename NodeDataType, typename SubmapDataType,
           typename RigidTransformType>
 class OptimizationProblemInterface {
  public:
-  using Constraint = PoseGraphInterface::Constraint;
   using LandmarkNode = PoseGraphInterface::LandmarkNode;
 
   OptimizationProblemInterface() {}

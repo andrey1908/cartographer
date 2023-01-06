@@ -52,7 +52,7 @@ std::vector<int> ComputeSubmapRepresentativeNode(
   std::vector<int> submap_to_node_index;
   for (const auto& constraint : pose_graph.constraint()) {
     if (constraint.tag() !=
-        mapping::proto::PoseGraph::Constraint::INTRA_SUBMAP) {
+        mapping::proto::Constraint::INTRA_SUBMAP) {
       continue;
     }
     CHECK_EQ(constraint.submap_id().trajectory_id(), 0);
@@ -88,7 +88,7 @@ proto::GroundTruth GenerateGroundTruth(
   for (const auto& constraint : pose_graph.constraint()) {
     // We're only interested in loop closure constraints.
     if (constraint.tag() ==
-        mapping::proto::PoseGraph::Constraint::INTRA_SUBMAP) {
+        mapping::proto::Constraint::INTRA_SUBMAP) {
       continue;
     }
 

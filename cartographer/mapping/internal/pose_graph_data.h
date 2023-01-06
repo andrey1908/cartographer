@@ -66,8 +66,6 @@ struct PoseGraphData {
   std::map<int, InternalTrajectoryState> trajectories_state;
 
   std::map<int, PoseGraph::InitialTrajectoryPose> initial_trajectory_poses;
-
-  std::vector<PoseGraphInterface::Constraint> constraints;
 };
 
 }  // namespace mapping

@@ -60,7 +60,7 @@ namespace constraints {
 // This class is thread-safe.
 class ConstraintBuilder3D {
  public:
-  using Constraint = mapping::PoseGraphInterface::Constraint;
+  using Constraint = mapping::Constraint;
   using Result = std::vector<Constraint>;
 
   ConstraintBuilder3D(const proto::ConstraintBuilderOptions& options,

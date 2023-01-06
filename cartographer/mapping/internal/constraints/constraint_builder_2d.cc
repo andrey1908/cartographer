@@ -193,7 +193,7 @@ void ConstraintBuilder2D::ComputeConstraint(
     const TrajectoryNode::Data* const constant_data,
     const transform::Rigid2d& initial_relative_pose,
     const SubmapScanMatcher& submap_scan_matcher,
-    std::unique_ptr<ConstraintBuilder2D::Constraint>* constraint) {
+    std::unique_ptr<Constraint>* constraint) {
   static time_measurer::TimeMeasurer compute_successful_global_constraint_time_measurer("compute_successful_global_constraint", true);
   static time_measurer::TimeMeasurer compute_successful_local_constraint_time_measurer("compute_successful_local_constraint", true);
   if (match_full_submap) {

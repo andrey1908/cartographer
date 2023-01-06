@@ -239,8 +239,8 @@ TEST_P(MapBuilderTestByGridType, GlobalSlam2D) {
   EXPECT_GE(map_builder_->pose_graph()->constraints().size(), 50);
   EXPECT_THAT(map_builder_->pose_graph()->constraints(),
               ::testing::Contains(::testing::Field(
-                  &PoseGraphInterface::Constraint::tag,
-                  PoseGraphInterface::Constraint::INTER_SUBMAP)));
+                  &Constraint::tag,
+                  Constraint::INTER_SUBMAP)));
   const auto trajectory_nodes =
       map_builder_->pose_graph()->GetTrajectoryNodes();
   EXPECT_GE(trajectory_nodes.SizeOfTrajectoryOrZero(trajectory_id), 20);
@@ -282,8 +282,8 @@ TEST_F(MapBuilderTest, GlobalSlam3D) {
   EXPECT_GE(map_builder_->pose_graph()->constraints().size(), 10);
   EXPECT_THAT(map_builder_->pose_graph()->constraints(),
               ::testing::Contains(::testing::Field(
-                  &PoseGraphInterface::Constraint::tag,
-                  PoseGraphInterface::Constraint::INTER_SUBMAP)));
+                  &Constraint::tag,
+                  Constraint::INTER_SUBMAP)));
   const auto trajectory_nodes =
       map_builder_->pose_graph()->GetTrajectoryNodes();
   EXPECT_GE(trajectory_nodes.SizeOfTrajectoryOrZero(trajectory_id), 5);
@@ -447,8 +447,8 @@ TEST_P(MapBuilderTestByGridType, LocalizationOnFrozenTrajectory2D) {
   // TODO(gaschler): Subscribe global slam callback, verify that all nodes are
   // optimized.
   EXPECT_THAT(constraints, ::testing::Contains(::testing::Field(
-                               &PoseGraphInterface::Constraint::tag,
-                               PoseGraphInterface::Constraint::INTER_SUBMAP)));
+                               &Constraint::tag,
+                               Constraint::INTER_SUBMAP)));
   const auto trajectory_nodes =
       map_builder_->pose_graph()->GetTrajectoryNodes();
   EXPECT_GE(trajectory_nodes.SizeOfTrajectoryOrZero(trajectory_id), 20);

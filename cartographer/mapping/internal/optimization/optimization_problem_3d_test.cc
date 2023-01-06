@@ -137,24 +137,24 @@ TEST_F(OptimizationProblem3DTest, ReducesNoise) {
     now += common::FromSeconds(0.1);
   }
 
-  std::vector<OptimizationProblem3D::Constraint> constraints;
+  std::vector<Constraint> constraints;
   for (int j = 0; j != kNumNodes; ++j) {
-    constraints.push_back(OptimizationProblem3D::Constraint{
+    constraints.push_back(Constraint{
         SubmapId{kTrajectoryId, 0}, NodeId{kTrajectoryId, j},
-        OptimizationProblem3D::Constraint::Pose{
+        Constraint::Pose{
             AddNoise(test_data[j].ground_truth_pose, test_data[j].noise), 1.,
             1.}});
     // We add an additional independent, but equally noisy observation.
-    constraints.push_back(OptimizationProblem3D::Constraint{
+    constraints.push_back(Constraint{
         SubmapId{kTrajectoryId, 1}, NodeId{kTrajectoryId, j},
-        OptimizationProblem3D::Constraint::Pose{
+        Constraint::Pose{
             AddNoise(test_data[j].ground_truth_pose,
                      RandomYawOnlyTransform(0.2, 0.3)),
             1., 1.}});
     // We add very noisy data with a low weight to verify it is mostly ignored.
-    constraints.push_back(OptimizationProblem3D::Constraint{
+    constraints.push_back(Constraint{
         SubmapId{kTrajectoryId, 2}, NodeId{kTrajectoryId, j},
-        OptimizationProblem3D::Constraint::Pose{
+        Constraint::Pose{
             kSubmap2Transform.inverse() * test_data[j].ground_truth_pose *
                 RandomTransform(1e3, 3.),
             1e-9, 1e-9}});

@@ -199,7 +199,7 @@ PoseGraphStub::GetTrajectoryData() const {
   LOG(FATAL) << "Not implemented";
 }
 
-std::vector<mapping::PoseGraphInterface::Constraint>
+std::vector<mapping::Constraint>
 PoseGraphStub::constraints() const {
   google::protobuf::Empty request;
   async_grpc::Client<handlers::GetConstraintsSignature> client(client_channel_);

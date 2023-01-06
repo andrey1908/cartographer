@@ -37,6 +37,7 @@
 #include "cartographer/mapping/internal/optimization/optimization_problem_3d.h"
 #include "cartographer/mapping/internal/trajectory_connectivity_state.h"
 #include "cartographer/mapping/internal/pose_graph_data.h"
+#include "cartographer/mapping/internal/pose_graph_constraints.h"
 #include "cartographer/mapping/internal/work_queue.h"
 #include "cartographer/mapping/pose_graph.h"
 #include "cartographer/metrics/family_factory.h"
@@ -212,27 +213,15 @@ private:
       ABSL_LOCKS_EXCLUDED(mutex_)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
 
-  double GetTravelledDistanceWithLoopsSameTrajectory(
-      NodeId node_1, NodeId node_2, float min_score)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
-  double GetTravelledDistanceWithLoopsDifferentTrajectories(
-      NodeId node_1, NodeId node_2, float min_score)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
-  double GetTravelledDistanceWithLoops(
-      NodeId node_1, NodeId node_2, float min_score)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
-  std::vector<PoseGraphInterface::Constraint> TrimFalseDetectedLoops(
-      const std::vector<PoseGraphInterface::Constraint>& new_loops)
+  std::vector<Constraint> TrimFalseDetectedLoops(
+      const std::vector<Constraint>& new_loops)
           ABSL_LOCKS_EXCLUDED(mutex_)
           ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
   void TrimLoopsInWindow()
       ABSL_LOCKS_EXCLUDED(mutex_)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
-  std::vector<PoseGraphInterface::Constraint> TrimLoops(
-      const std::vector<PoseGraphInterface::Constraint>& new_loops)
+  std::vector<Constraint> TrimLoops(
+      const std::vector<Constraint>& new_loops)
           ABSL_LOCKS_EXCLUDED(mutex_)
           ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
 
@@ -363,9 +352,6 @@ private:
       ABSL_GUARDED_BY(executing_work_item_mutex_);
   std::set<int> pure_localization_trajectory_ids_
       ABSL_GUARDED_BY(executing_work_item_mutex_);
-  // loops trimmed by TrimmingHandle::TrimSubmap()
-  std::vector<TrimmedLoop> trimmed_loops_
-      ABSL_GUARDED_BY(executing_work_item_mutex_);
 
   double num_local_constraints_to_compute_ ABSL_GUARDED_BY(executing_work_item_mutex_);
   double num_global_constraints_to_compute_ ABSL_GUARDED_BY(executing_work_item_mutex_);
@@ -375,6 +361,7 @@ private:
       ABSL_GUARDED_BY(executing_work_item_mutex_);
 
   PoseGraphData data_ ABSL_GUARDED_BY(mutex_);
+  PoseGraphConstraints constraints_ ABSL_GUARDED_BY(mutex_);
 
   GlobalSlamOptimizationCallback global_slam_optimization_callback_
       ABSL_GUARDED_BY(executing_work_item_mutex_);

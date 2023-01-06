@@ -36,7 +36,7 @@ namespace optimization {
 class SpaCostFunction3D {
  public:
   static ceres::CostFunction* CreateAutoDiffCostFunction(
-      const PoseGraph::Constraint::Pose& pose) {
+      const Constraint::Pose& pose) {
     return new ceres::AutoDiffCostFunction<
         SpaCostFunction3D, 6 /* residuals */, 4 /* rotation variables */,
         3 /* translation variables */, 4 /* rotation variables */,
@@ -56,10 +56,10 @@ class SpaCostFunction3D {
   }
 
  private:
-  explicit SpaCostFunction3D(const PoseGraph::Constraint::Pose& pose)
+  explicit SpaCostFunction3D(const Constraint::Pose& pose)
       : pose_(pose) {}
 
-  const PoseGraph::Constraint::Pose pose_;
+  const Constraint::Pose pose_;
 };
 
 }  // namespace optimization

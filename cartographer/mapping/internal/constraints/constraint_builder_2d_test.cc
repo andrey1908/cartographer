@@ -100,8 +100,8 @@ TEST_F(ConstraintBuilder2DTest, FindsConstraints) {
                 Run(::testing::AllOf(
                     ::testing::SizeIs(3),
                     ::testing::Each(::testing::Field(
-                        &PoseGraphInterface::Constraint::tag,
-                        PoseGraphInterface::Constraint::INTER_SUBMAP)))));
+                        &Constraint::tag,
+                        Constraint::INTER_SUBMAP)))));
     constraint_builder_->WhenDone(
         [this](const constraints::ConstraintBuilder2D::Result& result) {
           mock_.Run(result);

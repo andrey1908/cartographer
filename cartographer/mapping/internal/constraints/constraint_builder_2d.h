@@ -61,7 +61,6 @@ transform::Rigid2d ComputeSubmapPose(const Submap2D& submap);
 // This class is thread-safe.
 class ConstraintBuilder2D {
  public:
-  using Constraint = PoseGraphInterface::Constraint;
   using Result = std::vector<Constraint>;
 
   ConstraintBuilder2D(const proto::ConstraintBuilderOptions& options,

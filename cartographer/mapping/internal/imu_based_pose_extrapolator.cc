@@ -209,7 +209,7 @@ ImuBasedPoseExtrapolator::ExtrapolatePosesWithGravity(
     const auto& timed_pose = timed_pose_queue_[i];
     problem.AddResidualBlock(
         optimization::SpaCostFunction3D::CreateAutoDiffCostFunction(
-            PoseGraphInterface::Constraint::Pose{
+            Constraint::Pose{
                 timed_pose.transform, options_.pose_translation_weight(),
                 options_.pose_rotation_weight()}),
         nullptr /* loss function */, gravity_from_local.rotation(),
@@ -300,7 +300,7 @@ ImuBasedPoseExtrapolator::ExtrapolatePosesWithGravity(
 
       problem.AddResidualBlock(
           optimization::SpaCostFunction3D::CreateAutoDiffCostFunction(
-              PoseGraphInterface::Constraint::Pose{
+              Constraint::Pose{
                   relative_odometry, options_.odometry_translation_weight(),
                   options_.odometry_rotation_weight()}),
           nullptr /* loss function */, nodes.at(i - 1).rotation(),

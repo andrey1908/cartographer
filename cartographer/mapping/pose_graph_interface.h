@@ -24,44 +24,13 @@
 #include "cartographer/mapping/id.h"
 #include "cartographer/mapping/submaps.h"
 #include "cartographer/transform/rigid_transform.h"
+#include "cartographer/mapping/constraint.h"
 
 namespace cartographer {
 namespace mapping {
 
 class PoseGraphInterface {
  public:
-  // A "constraint" as in the paper by Konolige, Kurt, et al. "Efficient sparse
-  // pose adjustment for 2d mapping." Intelligent Robots and Systems (IROS),
-  // 2010 IEEE/RSJ International Conference on (pp. 22--29). IEEE, 2010.
-  struct Constraint {
-    struct Pose {
-      transform::Rigid3d zbar_ij;
-      double translation_weight;
-      double rotation_weight;
-    };
-
-    SubmapId submap_id;  // 'i' in the paper.
-    NodeId node_id;      // 'j' in the paper.
-
-    // Pose of the node 'j' relative to submap 'i'.
-    Pose pose;
-
-    // Differentiates between intra-submap (where node 'j' was inserted into
-    // submap 'i') and inter-submap constraints (where node 'j' was not inserted
-    // into submap 'i').
-    enum Tag { INTRA_SUBMAP, INTER_SUBMAP } tag;
-
-    float score;  // meaningful only for INTER_SUBMAP constraints
-  };
-
-  struct TrimmedLoop {
-    SubmapId submap_id;
-    NodeId node_id;
-    float score;
-    double travelled_distance_for_submap;
-    double travelled_distance_for_node;
-  };
-
   struct LandmarkNode {
     struct LandmarkObservation {
       int trajectory_id;

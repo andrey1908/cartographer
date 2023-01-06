@@ -57,9 +57,9 @@ class SubmapHistogramMigrationTest : public ::testing::Test {
   }
 
   void CreatePoseGraphWithNodeToSubmapConstraint() {
-    mapping::proto::PoseGraph::Constraint* constraint =
+    mapping::proto::Constraint* constraint =
         pose_graph_.add_constraint();
-    constraint->set_tag(mapping::proto::PoseGraph::Constraint::INTRA_SUBMAP);
+    constraint->set_tag(mapping::proto::Constraint::INTRA_SUBMAP);
     *constraint->mutable_node_id() = node_.node_id();
     *constraint->mutable_submap_id() = submap_.submap_id();
     *constraint->mutable_relative_pose() =

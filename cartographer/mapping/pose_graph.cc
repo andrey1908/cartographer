@@ -24,58 +24,6 @@
 namespace cartographer {
 namespace mapping {
 
-proto::PoseGraph::Constraint::Tag ToProto(
-    const PoseGraph::Constraint::Tag& tag) {
-  switch (tag) {
-    case PoseGraph::Constraint::Tag::INTRA_SUBMAP:
-      return proto::PoseGraph::Constraint::INTRA_SUBMAP;
-    case PoseGraph::Constraint::Tag::INTER_SUBMAP:
-      return proto::PoseGraph::Constraint::INTER_SUBMAP;
-  }
-  LOG(FATAL) << "Unsupported tag.";
-}
-
-PoseGraph::Constraint::Tag FromProto(
-    const proto::PoseGraph::Constraint::Tag& proto) {
-  switch (proto) {
-    case proto::PoseGraph::Constraint::INTRA_SUBMAP:
-      return PoseGraph::Constraint::Tag::INTRA_SUBMAP;
-    case proto::PoseGraph::Constraint::INTER_SUBMAP:
-      return PoseGraph::Constraint::Tag::INTER_SUBMAP;
-    case ::google::protobuf::kint32max:
-    case ::google::protobuf::kint32min: {
-    }
-  }
-  LOG(FATAL) << "Unsupported tag.";
-}
-
-std::vector<PoseGraph::Constraint> FromProto(
-    const ::google::protobuf::RepeatedPtrField<proto::PoseGraph::Constraint>&
-        constraint_protos) {
-  std::vector<PoseGraph::Constraint> constraints;
-  bool warned_about_constraints_without_scores = false;
-  for (const auto& constraint_proto : constraint_protos) {
-    const mapping::SubmapId submap_id{
-        constraint_proto.submap_id().trajectory_id(),
-        constraint_proto.submap_id().submap_index()};
-    const mapping::NodeId node_id{constraint_proto.node_id().trajectory_id(),
-                                  constraint_proto.node_id().node_index()};
-    const PoseGraph::Constraint::Pose pose{
-        transform::ToRigid3(constraint_proto.relative_pose()),
-        constraint_proto.translation_weight(),
-        constraint_proto.rotation_weight()};
-    const PoseGraph::Constraint::Tag tag = FromProto(constraint_proto.tag());
-    const float score = constraint_proto.score();
-    if (tag == PoseGraph::Constraint::Tag::INTER_SUBMAP &&
-        !warned_about_constraints_without_scores && score == 0.0f) {
-      LOG(WARNING) << "There are constraints with score 0 in the map.";
-      warned_about_constraints_without_scores = true;
-    }
-    constraints.push_back(PoseGraph::Constraint{submap_id, node_id, pose, tag, score});
-  }
-  return constraints;
-}
-
 void PopulateOverlappingSubmapsTrimmerOptions2D(
     proto::PoseGraphOptions* const pose_graph_options,
     common::LuaParameterDictionary* const parameter_dictionary) {
@@ -131,25 +79,6 @@ proto::PoseGraphOptions CreatePoseGraphOptions(
           "global_constraint_search_after_n_seconds"));
   PopulateOverlappingSubmapsTrimmerOptions2D(&options, parameter_dictionary);
   return options;
-}
-
-proto::PoseGraph::Constraint ToProto(const PoseGraph::Constraint& constraint) {
-  proto::PoseGraph::Constraint constraint_proto;
-  *constraint_proto.mutable_relative_pose() =
-      transform::ToProto(constraint.pose.zbar_ij);
-  constraint_proto.set_translation_weight(constraint.pose.translation_weight);
-  constraint_proto.set_rotation_weight(constraint.pose.rotation_weight);
-  constraint_proto.mutable_submap_id()->set_trajectory_id(
-      constraint.submap_id.trajectory_id);
-  constraint_proto.mutable_submap_id()->set_submap_index(
-      constraint.submap_id.submap_index);
-  constraint_proto.mutable_node_id()->set_trajectory_id(
-      constraint.node_id.trajectory_id);
-  constraint_proto.mutable_node_id()->set_node_index(
-      constraint.node_id.node_index);
-  constraint_proto.set_tag(mapping::ToProto(constraint.tag));
-  constraint_proto.set_score(constraint.score);
-  return constraint_proto;
 }
 
 proto::PoseGraph PoseGraph::ToProto(bool include_unfinished_submaps) const {

@@ -204,9 +204,9 @@ MapById<SubmapId, proto::Submap> AddHistogramsToSubmaps(
   }
 
   MapById<SubmapId, proto::Submap> migrated_submaps = submap_id_to_submap;
-  for (const proto::PoseGraph::Constraint& constraint_proto :
+  for (const proto::Constraint& constraint_proto :
        pose_graph_proto.constraint()) {
-    if (constraint_proto.tag() == proto::PoseGraph::Constraint::INTRA_SUBMAP) {
+    if (constraint_proto.tag() == proto::Constraint::INTRA_SUBMAP) {
       NodeId node_id{constraint_proto.node_id().trajectory_id(),
                      constraint_proto.node_id().node_index()};
       CHECK(node_id_to_node.Contains(node_id));

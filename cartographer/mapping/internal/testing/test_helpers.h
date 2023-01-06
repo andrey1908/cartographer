@@ -44,7 +44,7 @@ proto::Submap CreateFakeSubmap3D(int trajectory_id = 1, int submap_index = 1,
 
 proto::Node CreateFakeNode(int trajectory_id = 1, int node_index = 1);
 
-proto::PoseGraph::Constraint CreateFakeConstraint(const proto::Node& node,
+proto::Constraint CreateFakeConstraint(const proto::Node& node,
                                                   const proto::Submap& submap);
 
 proto::Trajectory* CreateTrajectoryIfNeeded(int trajectory_id,
@@ -58,7 +58,7 @@ void AddToProtoGraph(const proto::Node& node_data,
 void AddToProtoGraph(const proto::Submap& submap_data,
                      proto::PoseGraph* pose_graph);
 
-void AddToProtoGraph(const proto::PoseGraph::Constraint& constraint,
+void AddToProtoGraph(const proto::Constraint& constraint,
                      proto::PoseGraph* pose_graph);
 
 void AddToProtoGraph(const proto::PoseGraph::LandmarkPose& landmark_node,

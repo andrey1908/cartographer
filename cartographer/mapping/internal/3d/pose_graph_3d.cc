@@ -538,11 +538,11 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
       data_.trajectory_nodes.at(node_id).submap_ids.emplace_back(submap_id);
       const transform::Rigid3d constraint_transform =
           insertion_submaps[i]->local_pose().inverse() * local_pose;
-      data_.constraints.push_back(Constraint{
+      constraints_.InsertConstraint(Constraint{
           submap_id,
           node_id,
           {constraint_transform, options_.matcher_translation_weight(),
-           options_.matcher_rotation_weight()},
+              options_.matcher_rotation_weight()},
           Constraint::INTRA_SUBMAP});
     }
     if (newly_finished_submap) {
@@ -641,9 +641,11 @@ NodeId PoseGraph3D::AppendNode(
     const SubmapId submap_id =
         data_.submap_data.Append(trajectory_id, InternalSubmapData());
     data_.submap_data.at(submap_id).submap = insertion_submaps.back();
-    // LOG(INFO) << "Inserted submap " << submap_id << ".";
+    constraints_.SetFirstNodeIdForSubmap(node_id, submap_id);
     kActiveSubmapsMetric->Increment();
   }
+  constraints_.SetTravelledDistance(node_id,
+      data_.trajectory_nodes.at(node_id).constant_data->travelled_distance);
   return node_id;
 }
 
@@ -684,7 +686,7 @@ common::Time PoseGraph3D::GetLatestNodeTime(
 }
 
 void PoseGraph3D::UpdateTrajectoryConnectivity(const Constraint& constraint) {
-  CHECK_EQ(constraint.tag, PoseGraphInterface::Constraint::INTER_SUBMAP);
+  CHECK_EQ(constraint.tag, Constraint::INTER_SUBMAP);
   const common::Time time =
       GetLatestNodeTime(constraint.node_id, constraint.submap_id);
   data_.trajectory_connectivity_state.Connect(
@@ -721,47 +723,35 @@ void PoseGraph3D::TrimSubmap(const SubmapId& submap_id) {
                       std::inserter(nodes_to_remove, nodes_to_remove.begin()));
 
   std::vector<Constraint> constraints;
-  for (const Constraint& constraint : data_.constraints) {
+  for (const Constraint& constraint : constraints_) {
     if (constraint.submap_id != submap_id) {
       constraints.push_back(constraint);
     } else {
       if (constraint.tag == Constraint::INTER_SUBMAP) {
-        const NodeId& first_node_id_for_submap =
-            *data_.submap_data.at(constraint.submap_id).node_ids.begin();
-        trimmed_loops_.push_back(
+        constraints_.InsertLoopFromTrimmedSubmap(
             TrimmedLoop{constraint.submap_id, constraint.node_id,
-                constraint.score,
-                data_.trajectory_nodes.at(
-                    first_node_id_for_submap).constant_data->travelled_distance,
-                data_.trajectory_nodes.at(
-                    constraint.node_id).constant_data->travelled_distance});
+                constraint.score});
       }
     }
   }
-  data_.constraints = std::move(constraints);
+  constraints_.SetConstraints(std::move(constraints));
 
   constraints.clear();
   std::set<SubmapId> other_submap_ids_losing_constraints;
-  for (const Constraint& constraint : data_.constraints) {
+  for (const Constraint& constraint : constraints_) {
     if (nodes_to_remove.count(constraint.node_id) == 0) {
       constraints.push_back(constraint);
     } else {
       CHECK(constraint.tag == Constraint::INTER_SUBMAP);
       other_submap_ids_losing_constraints.insert(constraint.submap_id);
-      const NodeId& first_node_id_for_submap =
-          *data_.submap_data.at(constraint.submap_id).node_ids.begin();
-      trimmed_loops_.push_back(
+      constraints_.InsertLoopFromTrimmedSubmap(
           TrimmedLoop{constraint.submap_id, constraint.node_id,
-              constraint.score,
-              data_.trajectory_nodes.at(
-                  first_node_id_for_submap).constant_data->travelled_distance,
-              data_.trajectory_nodes.at(
-                  constraint.node_id).constant_data->travelled_distance});
+              constraint.score});
     }
   }
-  data_.constraints = std::move(constraints);
+  constraints_.SetConstraints(std::move(constraints));
 
-  for (const Constraint& constraint : data_.constraints) {
+  for (const Constraint& constraint : constraints_) {
     if (constraint.tag == Constraint::Tag::INTER_SUBMAP) {
       other_submap_ids_losing_constraints.erase(constraint.submap_id);
     }
@@ -829,129 +819,11 @@ void PoseGraph3D::TrimPureLocalizationTrajectories() {
   }
 }
 
-double PoseGraph3D::GetTravelledDistanceWithLoopsSameTrajectory(
-    NodeId node_1, NodeId node_2, float min_score) {
-  CHECK(node_1.trajectory_id == node_2.trajectory_id);
-  if (node_1 == node_2) {
-    return 0.0;
-  }
-  if (node_2 < node_1) {
-    std::swap(node_1, node_2);
-  }
-  double travelled_distance =
-      data_.trajectory_nodes.at(node_2).constant_data->travelled_distance -
-      data_.trajectory_nodes.at(node_1).constant_data->travelled_distance;
-  CHECK(travelled_distance >= 0.0);
-  for (const Constraint& loop : data_.constraints) {
-    if (loop.tag == Constraint::INTRA_SUBMAP) {
-      continue;
-    }
-    if (loop.score < min_score) {
-      continue;
-    }
-    if (loop.node_id.trajectory_id != loop.submap_id.trajectory_id ||
-        loop.node_id.trajectory_id != node_1.trajectory_id) {
-      continue;
-    }
-    NodeId loop_node_1 = loop.node_id;
-    NodeId loop_node_2 = *data_.submap_data.at(loop.submap_id).node_ids.begin();
-    if (loop_node_2 < loop_node_1) {
-      std::swap(loop_node_1, loop_node_2);
-    }
-    if (loop_node_2.node_index <= node_1.node_index ||
-        loop_node_1.node_index >= node_2.node_index) {
-      continue;
-    }
-    double travelled_distance_with_loop =
-        std::abs(
-            data_.trajectory_nodes.at(node_1).constant_data->travelled_distance -
-            data_.trajectory_nodes.at(loop_node_1).constant_data->travelled_distance) +
-        std::abs(
-            data_.trajectory_nodes.at(node_2).constant_data->travelled_distance -
-            data_.trajectory_nodes.at(loop_node_2).constant_data->travelled_distance);
-    travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
-  }
-  return travelled_distance;
-}
-
-double PoseGraph3D::GetTravelledDistanceWithLoopsDifferentTrajectories(
-    NodeId node_1, NodeId node_2, float min_score) {
-  CHECK(node_1.trajectory_id != node_2.trajectory_id);
-  if (node_2 < node_1) {
-    std::swap(node_1, node_2);
-  }
-  double travelled_distance = std::numeric_limits<double>::max();
-  for (const Constraint& loop : data_.constraints) {
-    if (loop.tag == Constraint::INTRA_SUBMAP) {
-      continue;
-    }
-    if (loop.score < min_score) {
-      continue;
-    }
-    if (std::minmax(loop.node_id.trajectory_id, loop.submap_id.trajectory_id) !=
-        std::minmax(node_1.trajectory_id, node_2.trajectory_id)) {
-      continue;
-    }
-    NodeId loop_node_1 = loop.node_id;
-    NodeId loop_node_2 = *data_.submap_data.at(loop.submap_id).node_ids.begin();
-    if (loop_node_2 < loop_node_1) {
-      std::swap(loop_node_1, loop_node_2);
-    }
-    double travelled_distance_with_loop =
-        GetTravelledDistanceWithLoopsSameTrajectory(node_1, loop_node_1, min_score) +
-        GetTravelledDistanceWithLoopsSameTrajectory(node_2, loop_node_2, min_score);
-    travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
-  }
-  for (const TrimmedLoop& loop : trimmed_loops_) {
-    if (loop.score < min_score) {
-      continue;
-    }
-    if (std::minmax(loop.node_id.trajectory_id, loop.submap_id.trajectory_id) !=
-        std::minmax(node_1.trajectory_id, node_2.trajectory_id)) {
-      continue;
-    }
-    if (loop.submap_id.trajectory_id != node_1.trajectory_id) {
-      std::swap(node_1, node_2);
-    }
-    double travelled_distance_1, travelled_distance_2;
-    if (data_.submap_data.Contains(loop.submap_id)) {
-      const NodeId& loop_node_1 = *data_.submap_data.at(loop.submap_id).node_ids.begin();
-      travelled_distance_1 =
-          GetTravelledDistanceWithLoopsSameTrajectory(node_1, loop_node_1, min_score);
-    } else {
-      travelled_distance_1 = std::abs(
-          data_.trajectory_nodes.at(node_1).constant_data->travelled_distance -
-          loop.travelled_distance_for_submap);
-    }
-    if (data_.trajectory_nodes.Contains(loop.node_id)) {
-      travelled_distance_2 =
-          GetTravelledDistanceWithLoopsSameTrajectory(node_2, loop.node_id, min_score);
-    } else {
-      travelled_distance_2 = std::abs(
-          data_.trajectory_nodes.at(node_2).constant_data->travelled_distance -
-          loop.travelled_distance_for_node);
-    }
-    double travelled_distance_with_loop =
-        travelled_distance_1 + travelled_distance_2;
-    travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
-  }
-  return travelled_distance;
-}
-
-double PoseGraph3D::GetTravelledDistanceWithLoops(
-    NodeId node_1, NodeId node_2, float min_score) {
-  if (node_1.trajectory_id == node_2.trajectory_id) {
-    return GetTravelledDistanceWithLoopsSameTrajectory(node_1, node_2, min_score);
-  } else {
-    return GetTravelledDistanceWithLoopsDifferentTrajectories(node_1, node_2, min_score);
-  }
-}
-
-std::vector<PoseGraphInterface::Constraint>
-PoseGraph3D::TrimFalseDetectedLoops(const std::vector<PoseGraphInterface::Constraint>& new_loops) {
+std::vector<Constraint>
+PoseGraph3D::TrimFalseDetectedLoops(const std::vector<Constraint>& new_loops) {
   absl::MutexLock locker(&mutex_);
   int num_before = new_loops.size();
-  std::vector<PoseGraphInterface::Constraint> true_detected_loops;
+  std::vector<Constraint> true_detected_loops;
   true_detected_loops.reserve(new_loops.size());
   for (const auto& new_loop : new_loops) {
     int loop_trimmer_trajectory_id;
@@ -975,7 +847,8 @@ PoseGraph3D::TrimFalseDetectedLoops(const std::vector<PoseGraphInterface::Constr
     const NodeId& new_loop_node_2 =
         *data_.submap_data.at(new_loop.submap_id).node_ids.begin();
     double travelled_distance =
-        GetTravelledDistanceWithLoops(new_loop_node_1, new_loop_node_2, new_loop.score);
+        constraints_.GetTravelledDistanceWithLoops(
+            new_loop_node_1, new_loop_node_2, new_loop.score);
     const transform::Rigid3d& global_submap_pose =
         data_.global_submap_poses_3d.at(new_loop.submap_id).global_pose;
     const transform::Rigid3d& global_node_pose =
@@ -1001,7 +874,7 @@ void PoseGraph3D::TrimLoopsInWindow() {
   absl::MutexLock locker(&mutex_);
   int num_before = 0;
   MapById<SubmapId, MapById<NodeId, float>> sorted_loops;
-  for (const auto& constraint : data_.constraints) {
+  for (const auto& constraint : constraints_) {
     if (constraint.tag == Constraint::INTRA_SUBMAP) {
       continue;
     }
@@ -1053,20 +926,20 @@ void PoseGraph3D::TrimLoopsInWindow() {
   }
 
   int num_after = 0;
-  std::vector<PoseGraphInterface::Constraint> trimmed_constraints;
-  trimmed_constraints.reserve(data_.constraints.size());
-  for (const auto& constraint : data_.constraints) {
+  std::vector<Constraint> constraints_to_retain;
+  constraints_to_retain.reserve(constraints_.size());
+  for (const auto& constraint : constraints_) {
     if (constraint.tag == Constraint::INTRA_SUBMAP) {
-      trimmed_constraints.push_back(constraint);
-    } else if (loops_to_remove.count(std::make_pair(constraint.submap_id, constraint.node_id)) == 0 ||
-          data_.trajectory_connectivity_state.LastConnectionTime(
-              constraint.submap_id.trajectory_id, constraint.node_id.trajectory_id) ==
-          GetLatestNodeTime(constraint.node_id, constraint.submap_id)) {
-      trimmed_constraints.push_back(constraint);
+      constraints_to_retain.push_back(constraint);
+    } else if (
+        loops_to_remove.count(
+            std::make_pair(constraint.submap_id, constraint.node_id)) == 0 ||
+        constraints_.IsLoopLast(constraint)) {
+      constraints_to_retain.push_back(constraint);
       num_after++;
     }
   }
-  data_.constraints = std::move(trimmed_constraints);
+  constraints_.SetConstraints(std::move(constraints_to_retain));
 
   if (options_.log_number_of_trimmed_loops()) {
     LOG(INFO) << "Trimmed " << num_before - num_after <<
@@ -1074,8 +947,8 @@ void PoseGraph3D::TrimLoopsInWindow() {
   }
 }
 
-std::vector<PoseGraphInterface::Constraint>
-PoseGraph3D::TrimLoops(const std::vector<PoseGraphInterface::Constraint>& new_loops) {
+std::vector<Constraint>
+PoseGraph3D::TrimLoops(const std::vector<Constraint>& new_loops) {
   MEASURE_BLOCK_TIME(trim_loops);
   auto true_detected_loops = TrimFalseDetectedLoops(new_loops);
   TrimLoopsInWindow();
@@ -1108,8 +981,8 @@ void PoseGraph3D::HandleWorkQueue(
   constraints::ConstraintBuilder3D::Result true_detected_loops = TrimLoops(result);
   {
     absl::MutexLock locker(&mutex_);
-    data_.constraints.insert(data_.constraints.end(), true_detected_loops.begin(),
-                             true_detected_loops.end());
+    constraints_.InsertConstraints(
+        true_detected_loops.begin(), true_detected_loops.end());
   }
 
   MEASURE_TIME_FROM_HERE(optimization);
@@ -1132,9 +1005,9 @@ void PoseGraph3D::HandleWorkQueue(
     // Update the gauges that count the current number of constraints.
     double inter_constraints_same_trajectory = 0;
     double inter_constraints_different_trajectory = 0;
-    for (const auto& constraint : data_.constraints) {
+    for (const auto& constraint : constraints_) {
       if (constraint.tag ==
-          cartographer::mapping::PoseGraph::Constraint::INTRA_SUBMAP) {
+          cartographer::mapping::Constraint::INTRA_SUBMAP) {
         continue;
       }
       if (constraint.node_id.trajectory_id ==
@@ -1238,11 +1111,11 @@ void PoseGraph3D::RunOptimization() {
     return;
   }
 
-  // No other thread is accessing the optimization_problem_, data_.constraints,
+  // No other thread is accessing the optimization_problem_, constraints_,
   // data_.frozen_trajectories and data_.landmark_nodes when executing the
   // Solve. Solve is time consuming, so not taking the mutex before Solve to
   // avoid blocking foreground processing.
-  optimization_problem_->Solve(data_.constraints, GetTrajectoryStates(),
+  optimization_problem_->Solve(constraints_.constraints(), GetTrajectoryStates(),
                                data_.landmark_nodes);
 
 
@@ -1354,8 +1227,7 @@ void PoseGraph3D::WaitForAllComputations() {
       [this,
        &notification](const constraints::ConstraintBuilder3D::Result& result) {
             absl::MutexLock locker(&mutex_);
-            data_.constraints.insert(data_.constraints.end(), result.begin(),
-                                     result.end());
+            constraints_.InsertConstraints(result.begin(), result.end());
             notification = true;
           });
   const auto predicate = [&notification]() {
@@ -1524,6 +1396,8 @@ void PoseGraph3D::AddNodeFromProto(
     data_.trajectory_nodes.Insert(node_id,
         TrajectoryNode{constant_data, global_pose});
     data_.trajectory_nodes.at(node_id).submap_ids.reserve(2);
+    constraints_.SetTravelledDistance(node_id,
+        data_.trajectory_nodes.at(node_id).constant_data->travelled_distance);
   }
 
   AddWorkItem([this, node_id, global_pose]()
@@ -1597,9 +1471,9 @@ void PoseGraph3D::AddSerializedConstraints(
       switch (constraint.tag) {
         case Constraint::Tag::INTRA_SUBMAP:
           {
-            bool added = data_.submap_data.at(constraint.submap_id)
+            bool emplaced = data_.submap_data.at(constraint.submap_id)
                 .node_ids.emplace(constraint.node_id).second;
-            CHECK(added);
+            CHECK(emplaced);
             std::vector<SubmapId>& submap_ids_for_node =
                 data_.trajectory_nodes.at(constraint.node_id).submap_ids;
             submap_ids_for_node.emplace_back(constraint.submap_id);
@@ -1610,7 +1484,11 @@ void PoseGraph3D::AddSerializedConstraints(
           UpdateTrajectoryConnectivity(constraint);
           break;
       }
-      data_.constraints.push_back(constraint);
+      constraints_.InsertConstraint(constraint);
+    }
+    for (const auto& [submap_id, submap_data] : data_.submap_data) {
+      CHECK(submap_data.node_ids.size());
+      constraints_.SetFirstNodeIdForSubmap(*submap_data.node_ids.begin(), submap_id);
     }
     LOG(INFO) << "Loaded " << constraints.size() << " constraints.";
     return WorkItem::Result::kDoNotRunOptimization;
@@ -1872,9 +1750,9 @@ PoseGraph3D::GetTrajectoryData() const {
   return optimization_problem_->trajectory_data();
 }
 
-std::vector<PoseGraphInterface::Constraint> PoseGraph3D::constraints() const {
+std::vector<Constraint> PoseGraph3D::constraints() const {
   absl::MutexLock locker(&mutex_);
-  return data_.constraints;
+  return constraints_.constraints();
 }
 
 void PoseGraph3D::SetGlobalSlamOptimizationCallback(
@@ -1890,7 +1768,7 @@ void PoseGraph3D::SetGlobalSlamOptimizationCallback(
 void PoseGraph3D::LogResidualHistograms() const {
   common::Histogram rotational_residual;
   common::Histogram translational_residual;
-  for (const Constraint& constraint : data_.constraints) {
+  for (const Constraint& constraint : constraints_) {
     if (constraint.tag == Constraint::Tag::INTRA_SUBMAP) {
       const cartographer::transform::Rigid3d optimized_node_to_map =
           data_.trajectory_nodes.at(constraint.node_id).global_pose;

@@ -45,7 +45,7 @@ using JacobianType = std::array<std::array<double, kJacobianColDimension>,
 class SpaCostFunction2DTest : public ::testing::Test {
  public:
   SpaCostFunction2DTest()
-      : constraint_(PoseGraphInterface::Constraint::Pose{
+      : constraint_(Constraint::Pose{
             transform::Rigid3d(Eigen::Vector3d(1., 1., 1.),
                                Eigen::Quaterniond(1., 1., -1., -1.)),
             1, 10}),
@@ -78,7 +78,7 @@ class SpaCostFunction2DTest : public ::testing::Test {
   ResidualType residuals_;
   JacobianType jacobian_;
   std::array<double*, kParameterBlocksCount> jacobian_ptrs_;
-  PoseGraphInterface::Constraint::Pose constraint_;
+  Constraint::Pose constraint_;
   std::unique_ptr<ceres::CostFunction> auto_diff_cost_;
   std::unique_ptr<ceres::CostFunction> analytical_cost_;
 };

@@ -102,9 +102,9 @@ proto::Node CreateFakeNode(int trajectory_id, int node_index) {
   return proto;
 }
 
-proto::PoseGraph::Constraint CreateFakeConstraint(const proto::Node& node,
+proto::Constraint CreateFakeConstraint(const proto::Node& node,
                                                   const proto::Submap& submap) {
-  proto::PoseGraph::Constraint proto;
+  proto::Constraint proto;
   proto.mutable_submap_id()->set_submap_index(
       submap.submap_id().submap_index());
   proto.mutable_submap_id()->set_trajectory_id(
@@ -117,7 +117,7 @@ proto::PoseGraph::Constraint CreateFakeConstraint(const proto::Node& node,
   *proto.mutable_relative_pose() = transform::ToProto(pose);
   proto.set_translation_weight(0.2f);
   proto.set_rotation_weight(0.1f);
-  proto.set_tag(proto::PoseGraph::Constraint::INTER_SUBMAP);
+  proto.set_tag(proto::Constraint::INTER_SUBMAP);
   return proto;
 }
 
@@ -165,7 +165,7 @@ void AddToProtoGraph(const proto::Submap& submap_data,
   }
 }
 
-void AddToProtoGraph(const proto::PoseGraph::Constraint& constraint,
+void AddToProtoGraph(const proto::Constraint& constraint,
                      proto::PoseGraph* pose_graph) {
   *pose_graph->add_constraint() = constraint;
 }
