@@ -83,29 +83,15 @@ void PoseGraph3D::AddWorkItem(
           now - work_queue_->front().time).count());
 }
 
-void PoseGraph3D::AddTrajectoryIfNeeded(int trajectory_id) {
-  data_.trajectories_state[trajectory_id];
-  CHECK(data_.trajectories_state.at(trajectory_id).state !=
-        TrajectoryState::FINISHED);
-  CHECK(data_.trajectories_state.at(trajectory_id).state !=
-        TrajectoryState::DELETED);
-  CHECK(data_.trajectories_state.at(trajectory_id).deletion_state ==
-        InternalTrajectoryState::DeletionState::NORMAL);
-  data_.trajectory_connectivity_state.Add(trajectory_id);
-}
-
 void PoseGraph3D::DeleteTrajectoriesIfNeeded() {
   const auto& submap_data = optimization_problem_->submap_data();
-  for (auto& [trajectory_id, trajectory_state] : data_.trajectories_state) {
+  for (const auto& [trajectory_id, trajectory_state] : trajectory_states_) {
     if (trajectory_state.deletion_state ==
         InternalTrajectoryState::DeletionState::WAIT_FOR_DELETION) {
-      // TODO(gaschler): Consider directly deleting from data_, which may be
-      // more complete.
       for (const auto& submap_it : submap_data.trajectory(trajectory_id)) {
         TrimSubmap(submap_it.id);
       }
-      trajectory_state.state = TrajectoryState::DELETED;
-      trajectory_state.deletion_state = InternalTrajectoryState::DeletionState::NORMAL;
+      trajectory_states_.MarkTrajectoryAsDeleted(trajectory_id);
     }
   }
 }
@@ -118,9 +104,8 @@ void PoseGraph3D::AddImuData(
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    if (CanAddWorkItemModifying(trajectory_id)) {
-      optimization_problem_->AddImuData(trajectory_id, imu_data);
-    }
+    CHECK(trajectory_states_.CanModifyTrajectory(trajectory_id));
+    optimization_problem_->AddImuData(trajectory_id, imu_data);
     return WorkItem::Result::kDoNotRunOptimization;
   });
 }
@@ -133,9 +118,8 @@ void PoseGraph3D::AddOdometryData(
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    if (CanAddWorkItemModifying(trajectory_id)) {
-      optimization_problem_->AddOdometryData(trajectory_id, odometry_data);
-    }
+    CHECK(trajectory_states_.CanModifyTrajectory(trajectory_id));
+    optimization_problem_->AddOdometryData(trajectory_id, odometry_data);
     return WorkItem::Result::kDoNotRunOptimization;
   });
 }
@@ -148,10 +132,8 @@ void PoseGraph3D::AddFixedFramePoseData(
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    if (CanAddWorkItemModifying(trajectory_id)) {
-      optimization_problem_->AddFixedFramePoseData(trajectory_id,
-                                                   fixed_frame_pose_data);
-    }
+    CHECK(trajectory_states_.CanModifyTrajectory(trajectory_id));
+    optimization_problem_->AddFixedFramePoseData(trajectory_id, fixed_frame_pose_data);
     return WorkItem::Result::kDoNotRunOptimization;
   });
 }
@@ -164,14 +146,13 @@ void PoseGraph3D::AddLandmarkData(
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    if (CanAddWorkItemModifying(trajectory_id)) {
-      for (const auto& observation : landmark_data.landmark_observations) {
-        data_.landmark_nodes[observation.id].landmark_observations.emplace_back(
-            PoseGraphInterface::LandmarkNode::LandmarkObservation{
-                trajectory_id, landmark_data.time,
-                observation.landmark_to_tracking_transform,
-                observation.translation_weight, observation.rotation_weight});
-      }
+    CHECK(trajectory_states_.CanModifyTrajectory(trajectory_id));
+    for (const auto& observation : landmark_data.landmark_observations) {
+      data_.landmark_nodes[observation.id].landmark_observations.emplace_back(
+          PoseGraphInterface::LandmarkNode::LandmarkObservation{
+              trajectory_id, landmark_data.time,
+              observation.landmark_to_tracking_transform,
+              observation.translation_weight, observation.rotation_weight});
     }
     return WorkItem::Result::kDoNotRunOptimization;
   });
@@ -192,9 +173,9 @@ std::pair<bool, bool> PoseGraph3D::CheckIfConstraintCanBeAdded(
       return std::make_pair(false, false);
     }
     latest_node_time = GetLatestNodeTime(node_id, submap_id);
-    last_connection_time = data_.trajectory_connectivity_state.LastConnectionTime(
+    last_connection_time = trajectory_states_.LastConnectionTime(
         node_id.trajectory_id, submap_id.trajectory_id);
-    connected = data_.trajectory_connectivity_state.TransitivelyConnected(
+    connected = trajectory_states_.TransitivelyConnected(
         node_id.trajectory_id, submap_id.trajectory_id);
   }
   common::Duration global_constraint_search_after_n_seconds =
@@ -467,7 +448,7 @@ std::vector<SubmapId> PoseGraph3D::InitializeGlobalSubmapPoses(
     // If we don't already have an entry for the first submap, add one.
     if (submap_data.SizeOfTrajectoryOrZero(trajectory_id) == 0) {
       if (data_.initial_trajectory_poses.count(trajectory_id) > 0) {
-        data_.trajectory_connectivity_state.Connect(
+        trajectory_states_.Connect(
             trajectory_id,
             data_.initial_trajectory_poses.at(trajectory_id).to_trajectory_id,
             time);
@@ -624,10 +605,10 @@ NodeId PoseGraph3D::AppendNode(
     const std::vector<std::shared_ptr<const Submap3D>>& insertion_submaps,
     const transform::Rigid3d& optimized_pose) {
   absl::MutexLock locker(&mutex_);
-  AddTrajectoryIfNeeded(trajectory_id);
-  if (!CanAddWorkItemModifying(trajectory_id)) {
-    LOG(WARNING) << "AddNode was called for finished or deleted trajectory.";
+  if (!trajectory_states_.ContainsTrajectory(trajectory_id)) {
+    trajectory_states_.AddTrajectory(trajectory_id);
   }
+  CHECK(trajectory_states_.CanModifyTrajectory(trajectory_id));
   const NodeId node_id = data_.trajectory_nodes.Append(
       trajectory_id, TrajectoryNode{constant_data, optimized_pose});
   data_.trajectory_nodes.at(node_id).submap_ids.reserve(2);
@@ -689,7 +670,7 @@ void PoseGraph3D::UpdateTrajectoryConnectivity(const Constraint& constraint) {
   CHECK_EQ(constraint.tag, Constraint::INTER_SUBMAP);
   const common::Time time =
       GetLatestNodeTime(constraint.node_id, constraint.submap_id);
-  data_.trajectory_connectivity_state.Connect(
+  trajectory_states_.Connect(
       constraint.node_id.trajectory_id, constraint.submap_id.trajectory_id,
       time);
 }
@@ -771,7 +752,7 @@ void PoseGraph3D::TrimSubmap(const SubmapId& submap_id) {
   }
 
   kDeletedSubmapsMetric->Increment();
-  if (IsTrajectoryFrozenUnderLock(submap_id.trajectory_id)) {
+  if (trajectory_states_.IsTrajectoryFrozen(submap_id.trajectory_id)) {
     kFrozenSubmapsMetric->Decrement();
   } else {
     kActiveSubmapsMetric->Decrement();
@@ -782,20 +763,17 @@ void PoseGraph3D::TrimPureLocalizationTrajectories() {
   const auto& submap_data = optimization_problem_->submap_data();
   absl::MutexLock locker(&mutex_);
   for (auto& [trajectory_id, options] : pure_localization_trimmer_options_) {
-    if (data_.trajectories_state.count(trajectory_id) == 0) {
+    if (!trajectory_states_.ContainsTrajectory(trajectory_id)) {
+      continue;
+    }
+    if (trajectory_states_.IsTrajectoryDeleted(trajectory_id)) {
       continue;
     }
     int num_submaps = submap_data.SizeOfTrajectoryOrZero(trajectory_id);
     int i = 0;
-    CHECK(data_.trajectories_state.at(trajectory_id).deletion_state !=
-        InternalTrajectoryState::DeletionState::WAIT_FOR_DELETION);
-    auto& trajectory_state = data_.trajectories_state.at(trajectory_id);
-    if (trajectory_state.state == TrajectoryState::FINISHED) {
+    CHECK(!trajectory_states_.IsTrajectoryWaitingForDeletion(trajectory_id));
+    if (trajectory_states_.IsTrajectoryFinished(trajectory_id)) {
       options.set_max_submaps_to_keep(0);
-    }
-    if (trajectory_state.state == TrajectoryState::DELETED) {
-      options.set_max_submaps_to_keep(0);
-      continue;
     }
     for (const auto& it : submap_data.trajectory(trajectory_id)) {
       if (i + options.max_submaps_to_keep() >= num_submaps) {
@@ -805,8 +783,13 @@ void PoseGraph3D::TrimPureLocalizationTrajectories() {
       i++;
     }
     if (options.max_submaps_to_keep() == 0) {
-      trajectory_state.state = TrajectoryState::DELETED;
-      trajectory_state.deletion_state = InternalTrajectoryState::DeletionState::NORMAL;
+      if (trajectory_states_.IsTrajectoryDeletionStateNormal(trajectory_id)) {
+        trajectory_states_.ScheduleTrajectoryForDeletion(trajectory_id);
+      }
+      if (trajectory_states_.IsTrajectoryScheduledForDeletion(trajectory_id)) {
+        trajectory_states_.PrepareTrajectoryForDeletion(trajectory_id);
+      }
+      trajectory_states_.MarkTrajectoryAsDeleted(trajectory_id);
     }
   }
   for (auto it = pure_localization_trimmer_options_.begin();
@@ -1244,28 +1227,14 @@ void PoseGraph3D::WaitForAllComputations() {
 void PoseGraph3D::DeleteTrajectory(int trajectory_id) {
   {
     absl::MutexLock locker(&mutex_);
-    auto it = data_.trajectories_state.find(trajectory_id);
-    if (it == data_.trajectories_state.end()) {
-      LOG(WARNING) << "Skipping request to delete non-existing trajectory_id: "
-                   << trajectory_id;
-      return;
-    }
-    it->second.deletion_state =
-        InternalTrajectoryState::DeletionState::SCHEDULED_FOR_DELETION;
+    trajectory_states_.ScheduleTrajectoryForDeletion(trajectory_id);
   }
   AddWorkItem([this, trajectory_id]()
         ABSL_LOCKS_EXCLUDED(mutex_)
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    CHECK(data_.trajectories_state.at(trajectory_id).state !=
-          TrajectoryState::ACTIVE);
-    CHECK(data_.trajectories_state.at(trajectory_id).state !=
-          TrajectoryState::DELETED);
-    CHECK(data_.trajectories_state.at(trajectory_id).deletion_state ==
-          InternalTrajectoryState::DeletionState::SCHEDULED_FOR_DELETION);
-    data_.trajectories_state.at(trajectory_id).deletion_state =
-        InternalTrajectoryState::DeletionState::WAIT_FOR_DELETION;
+    trajectory_states_.PrepareTrajectoryForDeletion(trajectory_id);
     return WorkItem::Result::kDoNotRunOptimization;
   });
 }
@@ -1276,9 +1245,7 @@ void PoseGraph3D::FinishTrajectory(int trajectory_id) {
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    CHECK(!IsTrajectoryFinishedUnderLock(trajectory_id));
-    data_.trajectories_state[trajectory_id].state = TrajectoryState::FINISHED;
-
+    trajectory_states_.MarkTrajectoryAsFinished(trajectory_id);
     for (const auto& submap : data_.submap_data.trajectory(trajectory_id)) {
       data_.submap_data.at(submap.id).state = SubmapState::kFinished;
     }
@@ -1288,56 +1255,33 @@ void PoseGraph3D::FinishTrajectory(int trajectory_id) {
 
 bool PoseGraph3D::IsTrajectoryFinished(int trajectory_id) const {
   absl::MutexLock locker(&mutex_);
-  return IsTrajectoryFinishedUnderLock(trajectory_id);
-}
-
-bool PoseGraph3D::IsTrajectoryFinishedUnderLock(int trajectory_id) const {
-  return data_.trajectories_state.count(trajectory_id) != 0 &&
-         data_.trajectories_state.at(trajectory_id).state ==
-             TrajectoryState::FINISHED;
+  return trajectory_states_.IsTrajectoryFinished(trajectory_id);
 }
 
 void PoseGraph3D::FreezeTrajectory(int trajectory_id) {
-  {
-    absl::MutexLock locker(&mutex_);
-    data_.trajectory_connectivity_state.Add(trajectory_id);
-  }
   AddWorkItem([this, trajectory_id]()
         ABSL_LOCKS_EXCLUDED(mutex_)
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    CHECK(!IsTrajectoryFrozenUnderLock(trajectory_id));
-    // Connect multiple frozen trajectories among each other.
-    // This is required for localization against multiple frozen trajectories
-    // because we lose inter-trajectory constraints when freezing.
-    for (const auto& [other_trajectory_id, other_trajectory_state] :
-        data_.trajectories_state) {
+    for (const auto& [other_trajectory_id, other_trajectory_state] : trajectory_states_) {
       if (other_trajectory_state.state != TrajectoryState::FROZEN) {
         continue;
       }
-      if (data_.trajectory_connectivity_state.TransitivelyConnected(
-              trajectory_id, other_trajectory_id)) {
-        // Already connected, nothing to do.
+      if (trajectory_states_.TransitivelyConnected(trajectory_id, other_trajectory_id)) {
         continue;
       }
-      data_.trajectory_connectivity_state.Connect(
+      trajectory_states_.Connect(
           trajectory_id, other_trajectory_id, common::FromUniversal(0));
     }
-    data_.trajectories_state[trajectory_id].state = TrajectoryState::FROZEN;
+    trajectory_states_.MarkTrajectoryAsFrozen(trajectory_id);
     return WorkItem::Result::kDoNotRunOptimization;
   });
 }
 
 bool PoseGraph3D::IsTrajectoryFrozen(int trajectory_id) const {
   absl::MutexLock locker(&mutex_);
-  return IsTrajectoryFrozenUnderLock(trajectory_id);
-}
-
-bool PoseGraph3D::IsTrajectoryFrozenUnderLock(int trajectory_id) const {
-  return data_.trajectories_state.count(trajectory_id) != 0 &&
-         data_.trajectories_state.at(trajectory_id).state ==
-             TrajectoryState::FROZEN;
+  return trajectory_states_.IsTrajectoryFrozen(trajectory_id);
 }
 
 void PoseGraph3D::AddSubmapFromProto(
@@ -1354,8 +1298,9 @@ void PoseGraph3D::AddSubmapFromProto(
 
   {
     absl::MutexLock locker(&mutex_);
-    AddTrajectoryIfNeeded(submap_id.trajectory_id);
-    if (!CanAddWorkItemModifying(submap_id.trajectory_id)) return;
+    if (!trajectory_states_.ContainsTrajectory(submap_id.trajectory_id)) {
+      trajectory_states_.AddTrajectory(submap_id.trajectory_id);
+    }
     data_.submap_data.Insert(submap_id, InternalSubmapData());
     data_.submap_data.at(submap_id).submap = submap_ptr;
     // Immediately show the submap at the 'global_submap_pose'.
@@ -1363,7 +1308,7 @@ void PoseGraph3D::AddSubmapFromProto(
         submap_id, optimization::SubmapSpec3D{global_submap_pose});
     // TODO(MichaelGrupp): MapBuilder does freezing before deserializing submaps,
     // so this should be fine.
-    if (IsTrajectoryFrozenUnderLock(submap_id.trajectory_id)) {
+    if (trajectory_states_.IsTrajectoryFrozen(submap_id.trajectory_id)) {
       kFrozenSubmapsMetric->Increment();
     } else {
       kActiveSubmapsMetric->Increment();
@@ -1391,8 +1336,9 @@ void PoseGraph3D::AddNodeFromProto(
 
   {
     absl::MutexLock locker(&mutex_);
-    AddTrajectoryIfNeeded(node_id.trajectory_id);
-    if (!CanAddWorkItemModifying(node_id.trajectory_id)) return;
+    if (!trajectory_states_.ContainsTrajectory(node_id.trajectory_id)) {
+      trajectory_states_.AddTrajectory(node_id.trajectory_id);
+    }
     data_.trajectory_nodes.Insert(node_id,
         TrajectoryNode{constant_data, global_pose});
     data_.trajectory_nodes.at(node_id).submap_ids.reserve(2);
@@ -1433,9 +1379,7 @@ void PoseGraph3D::SetTrajectoryDataFromProto(
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    if (CanAddWorkItemModifying(trajectory_id)) {
-      optimization_problem_->SetTrajectoryData(trajectory_id, trajectory_data);
-    }
+    optimization_problem_->SetTrajectoryData(trajectory_id, trajectory_data);
     return WorkItem::Result::kDoNotRunOptimization;
   });
 }
@@ -1517,34 +1461,6 @@ void PoseGraph3D::AddLoopTrimmer(int trajectory_id,
   });
 }
 
-bool PoseGraph3D::CanAddWorkItemModifying(int trajectory_id) {
-  auto it = data_.trajectories_state.find(trajectory_id);
-  if (it == data_.trajectories_state.end()) {
-    return true;
-  }
-  if (it->second.state == TrajectoryState::FINISHED) {
-    // TODO(gaschler): Replace all FATAL to WARNING after some testing.
-    LOG(FATAL) << "trajectory_id " << trajectory_id
-               << " has finished "
-                  "but modification is requested, skipping.";
-    return false;
-  }
-  if (it->second.deletion_state !=
-      InternalTrajectoryState::DeletionState::NORMAL) {
-    LOG(FATAL) << "trajectory_id " << trajectory_id
-               << " has been scheduled for deletion "
-                  "but modification is requested, skipping.";
-    return false;
-  }
-  if (it->second.state == TrajectoryState::DELETED) {
-    LOG(FATAL) << "trajectory_id " << trajectory_id
-               << " has been deleted "
-                  "but modification is requested, skipping.";
-    return false;
-  }
-  return true;
-}
-
 void PoseGraph3D::SetInitialTrajectoryPose(
     int from_trajectory_id, int to_trajectory_id,
     const transform::Rigid3d& pose, common::Time time) {
@@ -1599,28 +1515,25 @@ transform::Rigid3d PoseGraph3D::ComputeLocalToGlobalTransform(
 
 std::vector<std::vector<int>> PoseGraph3D::GetConnectedTrajectories() const {
   absl::MutexLock locker(&mutex_);
-  return data_.trajectory_connectivity_state.Components();
+  return trajectory_states_.Components();
 }
 
 bool PoseGraph3D::TrajectoriesTransitivelyConnected(
-    int trajectory_id_a, int trajectory_id_b) const {
+    int trajectory_a, int trajectory_b) const {
   absl::MutexLock locker(&mutex_);
-  return data_.trajectory_connectivity_state.TransitivelyConnected(
-      trajectory_id_a, trajectory_id_b);
+  return trajectory_states_.TransitivelyConnected(trajectory_a, trajectory_b);
 }
 
 common::Time PoseGraph3D::TrajectoriesLastConnectionTime(
-    int trajectory_id_a, int trajectory_id_b) const {
+    int trajectory_a, int trajectory_b) const {
   absl::MutexLock locker(&mutex_);
-  return data_.trajectory_connectivity_state.LastConnectionTime(
-      trajectory_id_a, trajectory_id_b);
+  return trajectory_states_.LastConnectionTime(trajectory_a, trajectory_b);
 }
 
 transform::Rigid3d PoseGraph3D::GetLocalToGlobalTransform(
     int trajectory_id) const {
   absl::MutexLock locker(&mutex_);
-  return ComputeLocalToGlobalTransform(
-      data_.global_submap_poses_3d, trajectory_id);
+  return ComputeLocalToGlobalTransform(data_.global_submap_poses_3d, trajectory_id);
 }
 
 PoseGraphInterface::SubmapData PoseGraph3D::GetSubmapData(
@@ -1700,14 +1613,13 @@ MapById<NodeId, TrajectoryNodePose> PoseGraph3D::GetTrajectoryNodePoses() const 
   return node_poses;
 }
 
-std::map<int, PoseGraphInterface::TrajectoryState>
-PoseGraph3D::GetTrajectoryStates() const {
-  std::map<int, PoseGraphInterface::TrajectoryState> trajectories_state;
+std::map<int, TrajectoryState> PoseGraph3D::GetTrajectoryStates() const {
+  std::map<int, TrajectoryState> trajectory_states;
   absl::MutexLock locker(&mutex_);
-  for (const auto& it : data_.trajectories_state) {
-    trajectories_state[it.first] = it.second.state;
+  for (const auto& [trajectory_id, trajectory_state] : trajectory_states_) {
+    trajectory_states[trajectory_id] = trajectory_state.state;
   }
-  return trajectories_state;
+  return trajectory_states;
 }
 
 std::map<std::string, transform::Rigid3d> PoseGraph3D::GetLandmarkPoses() const {

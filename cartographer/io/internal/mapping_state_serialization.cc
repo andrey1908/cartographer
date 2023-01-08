@@ -25,6 +25,7 @@ namespace {
 using mapping::MapById;
 using mapping::NodeId;
 using mapping::PoseGraphInterface;
+using mapping::TrajectoryState;
 using mapping::SubmapId;
 using mapping::TrajectoryNode;
 using mapping::proto::SerializedData;
@@ -44,11 +45,11 @@ CreateAllTrajectoryBuilderOptionsProto(
 
 // Will return all trajectory ids, that have `state != DELETED`.
 std::vector<int> GetValidTrajectoryIds(
-    const std::map<int, PoseGraphInterface::TrajectoryState>&
+    const std::map<int, TrajectoryState>&
         trajectory_states) {
   std::vector<int> valid_trajectories;
   for (const auto& t : trajectory_states) {
-    if (t.second != PoseGraphInterface::TrajectoryState::DELETED) {
+    if (t.second != TrajectoryState::DELETED) {
       valid_trajectories.push_back(t.first);
     }
   }

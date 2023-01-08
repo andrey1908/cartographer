@@ -24,8 +24,8 @@ namespace cartographer {
 namespace cloud {
 
 proto::TrajectoryState ToProto(
-    const mapping::PoseGraphInterface::TrajectoryState& trajectory_state);
-mapping::PoseGraphInterface::TrajectoryState FromProto(
+    const mapping::TrajectoryState& trajectory_state);
+mapping::TrajectoryState FromProto(
     const proto::TrajectoryState& proto);
 
 proto::TrajectoryRemapping ToProto(

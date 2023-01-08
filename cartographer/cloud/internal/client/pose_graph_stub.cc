@@ -115,13 +115,13 @@ PoseGraphStub::GetTrajectoryNodePoses() const {
   return node_poses;
 }
 
-std::map<int, mapping::PoseGraphInterface::TrajectoryState>
+std::map<int, mapping::TrajectoryState>
 PoseGraphStub::GetTrajectoryStates() const {
   google::protobuf::Empty request;
   async_grpc::Client<handlers::GetTrajectoryStatesSignature> client(
       client_channel_);
   CHECK(client.Write(request));
-  std::map<int, mapping::PoseGraphInterface::TrajectoryState>
+  std::map<int, mapping::TrajectoryState>
       trajectories_state;
   for (const auto& entry : client.response().trajectories_state()) {
     trajectories_state[entry.first] = FromProto(entry.second);

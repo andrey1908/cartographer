@@ -68,7 +68,7 @@ class OptimizationProblemInterface {
   // Optimizes the global poses.
   virtual void Solve(
       const std::vector<Constraint>& constraints,
-      const std::map<int, PoseGraphInterface::TrajectoryState>&
+      const std::map<int, TrajectoryState>&
           trajectories_state,
       const std::map<std::string, LandmarkNode>& landmark_nodes) = 0;
 

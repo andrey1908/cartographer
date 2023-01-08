@@ -33,18 +33,6 @@ namespace mapping {
 
 enum class SubmapState { kNoConstraintSearch, kFinished };
 
-struct InternalTrajectoryState {
-  enum class DeletionState {
-    NORMAL,
-    SCHEDULED_FOR_DELETION,
-    WAIT_FOR_DELETION
-  };
-
-  PoseGraphInterface::TrajectoryState state =
-      PoseGraphInterface::TrajectoryState::ACTIVE;
-  DeletionState deletion_state = DeletionState::NORMAL;
-};
-
 struct InternalSubmapData {
   std::shared_ptr<const Submap> submap;
   SubmapState state = SubmapState::kNoConstraintSearch;
@@ -61,9 +49,7 @@ struct PoseGraphData {
 
   std::map<std::string, PoseGraphInterface::LandmarkNode> landmark_nodes;
 
-  TrajectoryConnectivityState trajectory_connectivity_state;
   int num_trajectory_nodes = 0;
-  std::map<int, InternalTrajectoryState> trajectories_state;
 
   std::map<int, PoseGraph::InitialTrajectoryPose> initial_trajectory_poses;
 };

@@ -46,7 +46,7 @@ class MockPoseGraph : public mapping::PoseGraphInterface {
       mapping::MapById<mapping::NodeId, mapping::TrajectoryNodePose>());
   MOCK_CONST_METHOD0(
       GetTrajectoryStates,
-      std::map<int, mapping::PoseGraphInterface::TrajectoryState>());
+      std::map<int, mapping::TrajectoryState>());
   MOCK_CONST_METHOD0(GetLandmarkPoses,
                      std::map<std::string, transform::Rigid3d>());
   MOCK_METHOD3(SetLandmarkPose,

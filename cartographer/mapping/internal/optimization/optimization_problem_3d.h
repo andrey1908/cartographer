@@ -92,7 +92,7 @@ public:
 
   void Solve(
       const std::vector<Constraint>& constraints,
-      const std::map<int, PoseGraphInterface::TrajectoryState>& trajectories_state,
+      const std::map<int, TrajectoryState>& trajectories_state,
       const std::map<std::string, LandmarkNode>& landmark_nodes) override;
 
   const sensor::MapByTime<sensor::ImuData>& imu_data() const override {

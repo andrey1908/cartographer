@@ -199,9 +199,9 @@ MapById<NodeId, TrajectoryNodePose> PoseGraph2D::GetTrajectoryNodePoses()
   return MapById<NodeId, TrajectoryNodePose>();
 }
 
-std::map<int, PoseGraphInterface::TrajectoryState>
+std::map<int, TrajectoryState>
 PoseGraph2D::GetTrajectoryStates() const {
-  return std::map<int, PoseGraphInterface::TrajectoryState>();
+  return std::map<int, TrajectoryState>();
 }
 
 std::map<std::string, transform::Rigid3d> PoseGraph2D::GetLandmarkPoses()

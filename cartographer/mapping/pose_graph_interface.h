@@ -25,6 +25,7 @@
 #include "cartographer/mapping/submaps.h"
 #include "cartographer/transform/rigid_transform.h"
 #include "cartographer/mapping/constraint.h"
+#include "cartographer/mapping/trajectory_state.h"
 
 namespace cartographer {
 namespace mapping {
@@ -59,8 +60,6 @@ class PoseGraphInterface {
     std::array<double, 4> imu_calibration{{1., 0., 0., 0.}};
     absl::optional<transform::Rigid3d> fixed_frame_origin_in_map;
   };
-
-  enum class TrajectoryState { ACTIVE, FINISHED, FROZEN, DELETED };
 
   using GlobalSlamOptimizationCallback =
       std::function<void(const std::map<int /* trajectory_id */, SubmapId>&,

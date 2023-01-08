@@ -261,7 +261,7 @@ void OptimizationProblem3D::SetMaxNumIterations(
 
 void OptimizationProblem3D::Solve(
     const std::vector<Constraint>& constraints,
-    const std::map<int, PoseGraphInterface::TrajectoryState>&
+    const std::map<int, TrajectoryState>&
         trajectories_state,
     const std::map<std::string, LandmarkNode>& landmark_nodes) {
   if (node_data_.empty()) {
@@ -271,7 +271,7 @@ void OptimizationProblem3D::Solve(
 
   std::set<int> frozen_trajectories;
   for (const auto& it : trajectories_state) {
-    if (it.second == PoseGraphInterface::TrajectoryState::FROZEN) {
+    if (it.second == TrajectoryState::FROZEN) {
       frozen_trajectories.insert(it.first);
     }
   }

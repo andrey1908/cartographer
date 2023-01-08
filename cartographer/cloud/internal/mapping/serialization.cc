@@ -23,7 +23,7 @@ namespace cloud {
 namespace {
 
 using TrajectoryState =
-    ::cartographer::mapping::PoseGraphInterface::TrajectoryState;
+    ::cartographer::mapping::TrajectoryState;
 
 }  // namespace
 

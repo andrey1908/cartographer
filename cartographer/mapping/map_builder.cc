@@ -244,9 +244,6 @@ std::map<int, int> MapBuilder::LoadState(
         AddTrajectoryForDeserialization(options_with_sensor_ids_proto);
     trajectory_remapping.emplace(trajectory_proto.trajectory_id(), new_trajectory_id);
     trajectory_proto.set_trajectory_id(new_trajectory_id);
-    if (load_frozen_state) {
-      pose_graph_->FreezeTrajectory(new_trajectory_id);
-    }
   }
 
   // Apply the calculated remapping to constraints in the pose graph proto.
@@ -363,10 +360,14 @@ std::map<int, int> MapBuilder::LoadState(
 
   pose_graph_->AddSerializedConstraints(
       FromProto(pose_graph_proto.constraint()));
-  if (!load_frozen_state) {
-    const auto& trajectory_states = pose_graph_->GetTrajectoryStates();
-    for (const auto& trajectory_id_state : trajectory_states) {
-      pose_graph_->FinishTrajectory(trajectory_id_state.first);
+
+  const auto& trajectory_states = pose_graph_->GetTrajectoryStates();
+  for (const auto& [trajectory_id, trajectory_state] : trajectory_states) {
+    CHECK(trajectory_state == TrajectoryState::ACTIVE);
+    if (load_frozen_state) {
+      pose_graph_->FreezeTrajectory(trajectory_id);
+    } else {
+      pose_graph_->FinishTrajectory(trajectory_id);
     }
   }
   CHECK(reader->eof());

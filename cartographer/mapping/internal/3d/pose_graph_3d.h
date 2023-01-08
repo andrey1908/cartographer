@@ -35,9 +35,9 @@
 #include "cartographer/mapping/3d/submap_3d.h"
 #include "cartographer/mapping/internal/constraints/constraint_builder_3d.h"
 #include "cartographer/mapping/internal/optimization/optimization_problem_3d.h"
-#include "cartographer/mapping/internal/trajectory_connectivity_state.h"
 #include "cartographer/mapping/internal/pose_graph_data.h"
 #include "cartographer/mapping/internal/pose_graph_constraints.h"
+#include "cartographer/mapping/internal/pose_graph_trajectory_states.h"
 #include "cartographer/mapping/internal/work_queue.h"
 #include "cartographer/mapping/pose_graph.h"
 #include "cartographer/metrics/family_factory.h"
@@ -137,10 +137,10 @@ public:
   std::vector<std::vector<int>> GetConnectedTrajectories() const override
       ABSL_LOCKS_EXCLUDED(mutex_);
   bool TrajectoriesTransitivelyConnected(
-      int trajectory_id_a, int trajectory_id_b) const override
+      int trajectory_a, int trajectory_b) const override
           ABSL_LOCKS_EXCLUDED(mutex_);
   common::Time TrajectoriesLastConnectionTime(
-      int trajectory_id_a, int trajectory_id_b) const override
+      int trajectory_a, int trajectory_b) const override
           ABSL_LOCKS_EXCLUDED(mutex_);
 
   transform::Rigid3d GetLocalToGlobalTransform(int trajectory_id) const
@@ -301,19 +301,10 @@ private:
       int trajectory_id) const
           ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  void AddTrajectoryIfNeeded(int trajectory_id)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void DeleteTrajectoriesIfNeeded()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
 
-  bool CanAddWorkItemModifying(int trajectory_id)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-
-  bool IsTrajectoryFinishedUnderLock(int trajectory_id) const
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  bool IsTrajectoryFrozenUnderLock(int trajectory_id) const
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   PoseGraph::SubmapData GetSubmapDataUnderLock(const SubmapId& submap_id) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   MapById<SubmapId, SubmapData> GetSubmapDataUnderLock() const
@@ -362,6 +353,7 @@ private:
 
   PoseGraphData data_ ABSL_GUARDED_BY(mutex_);
   PoseGraphConstraints constraints_ ABSL_GUARDED_BY(mutex_);
+  PoseGraphTrajectoryStates trajectory_states_ ABSL_GUARDED_BY(mutex_);
 
   GlobalSlamOptimizationCallback global_slam_optimization_callback_
       ABSL_GUARDED_BY(executing_work_item_mutex_);
