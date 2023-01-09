@@ -134,12 +134,6 @@ class PoseGraph : public PoseGraphInterface {
                                         const common::Time time) = 0;
 };
 
-std::vector<Constraint> FromProto(
-    const ::google::protobuf::RepeatedPtrField<
-        ::cartographer::mapping::proto::Constraint>&
-        constraint_protos);
-proto::Constraint ToProto(const Constraint& constraint);
-
 }  // namespace mapping
 }  // namespace cartographer
 

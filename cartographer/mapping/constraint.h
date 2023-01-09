@@ -23,5 +23,10 @@ struct Constraint {
   float score;  // meaningful only for INTER_SUBMAP constraints
 };
 
+std::vector<Constraint> FromProto(
+    const ::google::protobuf::RepeatedPtrField<proto::Constraint>&
+        constraint_protos);
+proto::Constraint ToProto(const Constraint& constraint);
+
 }
 }
