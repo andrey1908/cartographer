@@ -363,7 +363,7 @@ std::map<int, int> MapBuilder::LoadState(
 
   const auto& trajectory_states = pose_graph_->GetTrajectoryStates();
   for (const auto& [trajectory_id, trajectory_state] : trajectory_states) {
-    CHECK(trajectory_state == TrajectoryState::ACTIVE);
+    CHECK(trajectory_state.state == TrajectoryState::State::ACTIVE);
     if (load_frozen_state) {
       pose_graph_->FreezeTrajectory(trajectory_id);
     } else {

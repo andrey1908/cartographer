@@ -249,7 +249,7 @@ void OptimizationProblem2D::Solve(
 
   std::set<int> frozen_trajectories;
   for (const auto& it : trajectories_state) {
-    if (it.second == TrajectoryState::FROZEN) {
+    if (it.second.state == TrajectoryState::State::FROZEN) {
       frozen_trajectories.insert(it.first);
     }
   }

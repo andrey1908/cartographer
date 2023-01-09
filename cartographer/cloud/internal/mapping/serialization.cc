@@ -29,14 +29,14 @@ using TrajectoryState =
 
 proto::TrajectoryState ToProto(const TrajectoryState& trajectory_state) {
   switch (trajectory_state) {
-    case TrajectoryState::ACTIVE:
-      return proto::TrajectoryState::ACTIVE;
-    case TrajectoryState::FINISHED:
-      return proto::TrajectoryState::FINISHED;
-    case TrajectoryState::FROZEN:
-      return proto::TrajectoryState::FROZEN;
-    case TrajectoryState::DELETED:
-      return proto::TrajectoryState::DELETED;
+    case TrajectoryState::State::ACTIVE:
+      return proto::TrajectoryState::State::ACTIVE;
+    case TrajectoryState::State::FINISHED:
+      return proto::TrajectoryState::State::FINISHED;
+    case TrajectoryState::State::FROZEN:
+      return proto::TrajectoryState::State::FROZEN;
+    case TrajectoryState::State::DELETED:
+      return proto::TrajectoryState::State::DELETED;
     default:
       LOG(FATAL) << "Unknown TrajectoryState";
   }
@@ -44,14 +44,14 @@ proto::TrajectoryState ToProto(const TrajectoryState& trajectory_state) {
 
 TrajectoryState FromProto(const proto::TrajectoryState& proto) {
   switch (proto) {
-    case proto::TrajectoryState::ACTIVE:
-      return TrajectoryState::ACTIVE;
-    case proto::TrajectoryState::FINISHED:
-      return TrajectoryState::FINISHED;
-    case proto::TrajectoryState::FROZEN:
-      return TrajectoryState::FROZEN;
-    case proto::TrajectoryState::DELETED:
-      return TrajectoryState::DELETED;
+    case proto::TrajectoryState::State::ACTIVE:
+      return TrajectoryState::State::ACTIVE;
+    case proto::TrajectoryState::State::FINISHED:
+      return TrajectoryState::State::FINISHED;
+    case proto::TrajectoryState::State::FROZEN:
+      return TrajectoryState::State::FROZEN;
+    case proto::TrajectoryState::State::DELETED:
+      return TrajectoryState::State::DELETED;
     default:
       LOG(FATAL) << "Unknown proto::TrajectoryState";
   }

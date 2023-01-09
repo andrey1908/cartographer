@@ -49,7 +49,7 @@ std::vector<int> GetValidTrajectoryIds(
         trajectory_states) {
   std::vector<int> valid_trajectories;
   for (const auto& t : trajectory_states) {
-    if (t.second != TrajectoryState::DELETED) {
+    if (t.second.state != TrajectoryState::State::DELETED) {
       valid_trajectories.push_back(t.first);
     }
   }

@@ -366,11 +366,11 @@ TEST_P(ClientServerTestByGridType, LocalSlam2D) {
   }
   WaitForLocalSlamResults(measurements.size());
   EXPECT_EQ(stub_->pose_graph()->GetTrajectoryStates().at(trajectory_id),
-            TrajectoryState::ACTIVE);
+            TrajectoryState::State::ACTIVE);
   stub_->FinishTrajectory(trajectory_id);
   stub_->pose_graph()->RunFinalOptimization();
   EXPECT_EQ(stub_->pose_graph()->GetTrajectoryStates().at(trajectory_id),
-            TrajectoryState::FINISHED);
+            TrajectoryState::State::FINISHED);
   EXPECT_EQ(local_slam_result_poses_.size(), measurements.size());
   EXPECT_NEAR(kTravelDistance,
               (local_slam_result_poses_.back().translation() -
@@ -400,14 +400,14 @@ TEST_P(ClientServerTestByGridType, LocalSlamAndDelete2D) {
   WaitForLocalSlamResults(measurements.size());
   stub_->pose_graph()->RunFinalOptimization();
   EXPECT_EQ(stub_->pose_graph()->GetTrajectoryStates().at(trajectory_id),
-            TrajectoryState::ACTIVE);
+            TrajectoryState::State::ACTIVE);
   EXPECT_GT(stub_->pose_graph()->GetAllSubmapPoses().size(), 0);
   EXPECT_GT(stub_->pose_graph()->GetTrajectoryNodePoses().size(), 0);
   stub_->FinishTrajectory(trajectory_id);
   stub_->pose_graph()->DeleteTrajectory(trajectory_id);
   stub_->pose_graph()->RunFinalOptimization();
   EXPECT_EQ(stub_->pose_graph()->GetTrajectoryStates().at(trajectory_id),
-            TrajectoryState::DELETED);
+            TrajectoryState::State::DELETED);
   EXPECT_EQ(stub_->pose_graph()->GetAllSubmapPoses().size(), 0);
   EXPECT_EQ(stub_->pose_graph()->GetTrajectoryNodePoses().size(), 0);
   server_->Shutdown();
@@ -663,7 +663,7 @@ TEST_P(ClientServerTestByGridType, LoadStateAndDelete) {
     stub_->pose_graph()->DeleteTrajectory(trajectory_id);
     stub_->pose_graph()->RunFinalOptimization();
     EXPECT_EQ(stub_->pose_graph()->GetTrajectoryStates().at(trajectory_id),
-              TrajectoryState::DELETED);
+              TrajectoryState::State::DELETED);
   }
   server_->Shutdown();
 }
@@ -700,17 +700,17 @@ TEST_P(ClientServerTestByGridType, LoadUnfrozenStateAndDelete) {
       stub_->pose_graph()->IsTrajectoryFinished(expected_trajectory_id));
   EXPECT_EQ(
       stub_->pose_graph()->GetTrajectoryStates().at(expected_trajectory_id),
-      TrajectoryState::ACTIVE);
+      TrajectoryState::State::ACTIVE);
   stub_->FinishTrajectory(expected_trajectory_id);
   EXPECT_EQ(
       stub_->pose_graph()->GetTrajectoryStates().at(expected_trajectory_id),
-      TrajectoryState::FINISHED);
+      TrajectoryState::State::FINISHED);
   for (const auto& entry : trajectory_remapping) {
     int trajectory_id = entry.second;
     stub_->pose_graph()->DeleteTrajectory(trajectory_id);
     stub_->pose_graph()->RunFinalOptimization();
     EXPECT_EQ(stub_->pose_graph()->GetTrajectoryStates().at(trajectory_id),
-              TrajectoryState::DELETED);
+              TrajectoryState::State::DELETED);
   }
   server_->Shutdown();
 }
@@ -753,7 +753,7 @@ TEST_P(ClientServerTestByGridType, LocalSlam2DHandlesInvalidRequests) {
             stub_->SubmapToProto(kInvalidSubmapId1, &submap_query_response));
 
   EXPECT_EQ(stub_->pose_graph()->GetTrajectoryStates().at(trajectory_id),
-            TrajectoryState::ACTIVE);
+            TrajectoryState::State::ACTIVE);
   auto submap_poses = stub_->pose_graph()->GetAllSubmapPoses();
   EXPECT_GT(submap_poses.size(), 0);
   EXPECT_GT(stub_->pose_graph()->GetTrajectoryNodePoses().size(), 0);
@@ -764,7 +764,7 @@ TEST_P(ClientServerTestByGridType, LocalSlam2DHandlesInvalidRequests) {
   EXPECT_NE("",
             stub_->SubmapToProto(deleted_submap_id, &submap_query_response));
   EXPECT_EQ(stub_->pose_graph()->GetTrajectoryStates().at(trajectory_id),
-            TrajectoryState::DELETED);
+            TrajectoryState::State::DELETED);
   // Make sure optimization runs with a deleted trajectory.
   stub_->pose_graph()->RunFinalOptimization();
   server_->Shutdown();
