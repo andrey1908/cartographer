@@ -21,7 +21,6 @@
 #include <set>
 #include <vector>
 
-#include "cartographer/mapping/internal/optimization/optimization_problem_2d.h"
 #include "cartographer/mapping/internal/optimization/optimization_problem_3d.h"
 #include "cartographer/mapping/internal/trajectory_connectivity_state.h"
 #include "cartographer/mapping/pose_graph.h"
@@ -41,16 +40,10 @@ struct InternalSubmapData {
 
 struct PoseGraphData {
   MapById<SubmapId, InternalSubmapData> submap_data;
-
-  MapById<SubmapId, optimization::SubmapSpec2D> global_submap_poses_2d;
   MapById<SubmapId, optimization::SubmapSpec3D> global_submap_poses_3d;
-
   MapById<NodeId, TrajectoryNode> trajectory_nodes;
-
   std::map<std::string, PoseGraphInterface::LandmarkNode> landmark_nodes;
-
   int num_trajectory_nodes = 0;
-
   std::map<int, PoseGraph::InitialTrajectoryPose> initial_trajectory_poses;
 };
 

@@ -16,9 +16,7 @@ syntax = "proto3";
 
 package cartographer.mapping.constraints.proto;
 
-import "cartographer/mapping/proto/scan_matching/ceres_scan_matcher_options_2d.proto";
 import "cartographer/mapping/proto/scan_matching/ceres_scan_matcher_options_3d.proto";
-import "cartographer/mapping/proto/scan_matching/fast_correlative_scan_matcher_options_2d.proto";
 import "cartographer/mapping/proto/scan_matching/fast_correlative_scan_matcher_options_3d.proto";
 
 message ConstraintBuilderOptions {
@@ -41,10 +39,6 @@ message ConstraintBuilderOptions {
   bool log_matches = 8;
 
   // Options for the internally used scan matchers.
-  mapping.scan_matching.proto.FastCorrelativeScanMatcherOptions2D
-      fast_correlative_scan_matcher_options = 9;
-  mapping.scan_matching.proto.CeresScanMatcherOptions2D
-      ceres_scan_matcher_options = 11;
   mapping.scan_matching.proto.FastCorrelativeScanMatcherOptions3D
       fast_correlative_scan_matcher_options_3d = 10;
   mapping.scan_matching.proto.CeresScanMatcherOptions3D

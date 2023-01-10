@@ -19,7 +19,6 @@ import "cartographer/mapping/proto/pose_graph_options.proto";
 package cartographer.mapping.proto;
 
 message MapBuilderOptions {
-  bool use_trajectory_builder_2d = 1;
   bool use_trajectory_builder_3d = 2;
 
   // Number of threads to use for background computations.

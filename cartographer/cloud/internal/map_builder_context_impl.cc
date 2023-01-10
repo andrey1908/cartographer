@@ -15,21 +15,10 @@
  */
 
 #include "cartographer/cloud/internal/map_builder_server.h"
-#include "cartographer/mapping/internal/2d/local_slam_result_2d.h"
 #include "cartographer/mapping/internal/3d/local_slam_result_3d.h"
 
 namespace cartographer {
 namespace cloud {
-
-template <>
-void MapBuilderContext<mapping::Submap2D>::EnqueueLocalSlamResultData(
-    int trajectory_id, const std::string& sensor_id,
-    const mapping::proto::LocalSlamResultData& local_slam_result_data) {
-  map_builder_server_->incoming_data_queue_.Push(absl::make_unique<Data>(
-      Data{trajectory_id,
-           absl::make_unique<mapping::LocalSlamResult2D>(
-               sensor_id, local_slam_result_data, &submap_controller_)}));
-}
 
 template <>
 void MapBuilderContext<mapping::Submap3D>::EnqueueLocalSlamResultData(

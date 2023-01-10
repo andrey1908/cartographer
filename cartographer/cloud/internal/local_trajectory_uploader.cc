@@ -50,8 +50,7 @@ const std::set<::grpc::StatusCode> kUnrecoverableStatusCodes = {
 };
 
 bool IsNewSubmap(const mapping::proto::Submap& submap) {
-  return (submap.has_submap_2d() && submap.submap_2d().num_range_data() == 1) ||
-         (submap.has_submap_3d() && submap.submap_3d().num_range_data() == 1);
+  return submap.has_submap_3d() && submap.submap_3d().num_range_data() == 1;
 }
 
 class LocalTrajectoryUploader : public LocalTrajectoryUploaderInterface {

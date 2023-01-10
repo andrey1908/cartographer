@@ -25,7 +25,6 @@
 #include "cartographer/cloud/proto/map_builder_server_options.pb.h"
 #include "cartographer/common/internal/blocking_queue.h"
 #include "cartographer/common/time.h"
-#include "cartographer/mapping/2d/submap_2d.h"
 #include "cartographer/mapping/3d/submap_3d.h"
 #include "cartographer/mapping/internal/local_slam_result_data.h"
 #include "cartographer/mapping/internal/submap_controller.h"
@@ -76,7 +75,6 @@ class MapBuilderContext : public MapBuilderContextInterface {
 
 class MapBuilderServer : public MapBuilderServerInterface {
  public:
-  friend MapBuilderContext<mapping::Submap2D>;
   friend MapBuilderContext<mapping::Submap3D>;
 
   MapBuilderServer(

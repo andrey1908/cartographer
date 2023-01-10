@@ -93,7 +93,6 @@ TEST_F(SubmapHistogramMigrationTest,
   const mapping::proto::Submap& migrated_submap =
       submap_id_to_submap_migrated.at(submap_id);
 
-  EXPECT_FALSE(migrated_submap.has_submap_2d());
   EXPECT_TRUE(migrated_submap.has_submap_3d());
   const mapping::proto::Submap3D& migrated_submap_3d =
       migrated_submap.submap_3d();

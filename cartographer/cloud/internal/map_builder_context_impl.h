@@ -124,10 +124,6 @@ bool MapBuilderContext<SubmapType>::CheckClientIdForTrajectory(
 }
 
 template <>
-void MapBuilderContext<mapping::Submap2D>::EnqueueLocalSlamResultData(
-    int trajectory_id, const std::string& sensor_id,
-    const mapping::proto::LocalSlamResultData& local_slam_result_data);
-template <>
 void MapBuilderContext<mapping::Submap3D>::EnqueueLocalSlamResultData(
     int trajectory_id, const std::string& sensor_id,
     const mapping::proto::LocalSlamResultData& local_slam_result_data);

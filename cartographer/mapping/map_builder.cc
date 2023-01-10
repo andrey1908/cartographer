@@ -23,8 +23,6 @@
 #include "cartographer/io/proto_stream.h"
 #include "cartographer/io/proto_stream_deserializer.h"
 #include "cartographer/io/serialization_format_migration.h"
-#include "cartographer/mapping/internal/2d/local_trajectory_builder_2d.h"
-#include "cartographer/mapping/internal/2d/pose_graph_2d.h"
 #include "cartographer/mapping/internal/3d/local_trajectory_builder_3d.h"
 #include "cartographer/mapping/internal/3d/pose_graph_3d.h"
 #include "cartographer/mapping/internal/collated_trajectory_builder.h"
@@ -78,22 +76,12 @@ void MaybeAddLoopTrimmer(
 
 MapBuilder::MapBuilder(const proto::MapBuilderOptions& options)
     : options_(options), thread_pool_(options.num_background_threads()) {
-  CHECK(options.use_trajectory_builder_2d() ^
-        options.use_trajectory_builder_3d());
-  if (options.use_trajectory_builder_2d()) {
-    pose_graph_ = absl::make_unique<PoseGraph2D>(
-        options_.pose_graph_options(),
-        absl::make_unique<optimization::OptimizationProblem2D>(
-            options_.pose_graph_options().optimization_problem_options()),
-        &thread_pool_);
-  }
-  if (options.use_trajectory_builder_3d()) {
-    pose_graph_ = absl::make_unique<PoseGraph3D>(
-        options_.pose_graph_options(),
-        absl::make_unique<optimization::OptimizationProblem3D>(
-            options_.pose_graph_options().optimization_problem_options()),
-        &thread_pool_);
-  }
+  CHECK(options.use_trajectory_builder_3d());
+  pose_graph_ = absl::make_unique<PoseGraph3D>(
+      options_.pose_graph_options(),
+      absl::make_unique<optimization::OptimizationProblem3D>(
+          options_.pose_graph_options().optimization_problem_options()),
+      &thread_pool_);
   if (options.collate_by_trajectory()) {
     sensor_collator_ = absl::make_unique<sensor::TrajectoryCollator>();
   } else {
@@ -114,37 +102,21 @@ int MapBuilder::AddTrajectoryBuilder(
         MotionFilter(trajectory_options.pose_graph_odometry_motion_filter()));
   }
 
-  if (options_.use_trajectory_builder_3d()) {
-    std::unique_ptr<LocalTrajectoryBuilder3D> local_trajectory_builder;
-    if (trajectory_options.has_trajectory_builder_3d_options()) {
-      local_trajectory_builder = absl::make_unique<LocalTrajectoryBuilder3D>(
-          trajectory_options.trajectory_builder_3d_options(),
-          SelectRangeSensorIds(expected_sensor_ids));
-    }
-    DCHECK(dynamic_cast<PoseGraph3D*>(pose_graph_.get()));
-    trajectory_builders_.push_back(absl::make_unique<CollatedTrajectoryBuilder>(
-        trajectory_options, sensor_collator_.get(), trajectory_id,
-        expected_sensor_ids,
-        CreateGlobalTrajectoryBuilder3D(
-            std::move(local_trajectory_builder), trajectory_id,
-            static_cast<PoseGraph3D*>(pose_graph_.get()),
-            local_slam_result_callback, pose_graph_odometry_motion_filter)));
-  } else {
-    std::unique_ptr<LocalTrajectoryBuilder2D> local_trajectory_builder;
-    if (trajectory_options.has_trajectory_builder_2d_options()) {
-      local_trajectory_builder = absl::make_unique<LocalTrajectoryBuilder2D>(
-          trajectory_options.trajectory_builder_2d_options(),
-          SelectRangeSensorIds(expected_sensor_ids));
-    }
-    DCHECK(dynamic_cast<PoseGraph2D*>(pose_graph_.get()));
-    trajectory_builders_.push_back(absl::make_unique<CollatedTrajectoryBuilder>(
-        trajectory_options, sensor_collator_.get(), trajectory_id,
-        expected_sensor_ids,
-        CreateGlobalTrajectoryBuilder2D(
-            std::move(local_trajectory_builder), trajectory_id,
-            static_cast<PoseGraph2D*>(pose_graph_.get()),
-            local_slam_result_callback, pose_graph_odometry_motion_filter)));
+  std::unique_ptr<LocalTrajectoryBuilder3D> local_trajectory_builder;
+  if (trajectory_options.has_trajectory_builder_3d_options()) {
+    local_trajectory_builder = absl::make_unique<LocalTrajectoryBuilder3D>(
+        trajectory_options.trajectory_builder_3d_options(),
+        SelectRangeSensorIds(expected_sensor_ids));
   }
+  DCHECK(dynamic_cast<PoseGraph3D*>(pose_graph_.get()));
+  trajectory_builders_.push_back(absl::make_unique<CollatedTrajectoryBuilder>(
+      trajectory_options, sensor_collator_.get(), trajectory_id,
+      expected_sensor_ids,
+      CreateGlobalTrajectoryBuilder3D(
+          std::move(local_trajectory_builder), trajectory_id,
+          static_cast<PoseGraph3D*>(pose_graph_.get()),
+          local_slam_result_callback, pose_graph_odometry_motion_filter)));
+
   MaybeAddPureLocalizationTrimmer(trajectory_id, trajectory_options,
                                   pose_graph_.get());
   MaybeAddLoopTrimmer(trajectory_id, trajectory_options,

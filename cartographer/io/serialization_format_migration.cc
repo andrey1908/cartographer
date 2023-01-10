@@ -198,8 +198,7 @@ MapById<SubmapId, proto::Submap> AddHistogramsToSubmaps(
     const MapById<SubmapId, proto::Submap>& submap_id_to_submap,
     const MapById<NodeId, proto::Node>& node_id_to_node,
     const proto::PoseGraph& pose_graph_proto) {
-  if (submap_id_to_submap.empty() ||
-      submap_id_to_submap.begin()->data.has_submap_2d()) {
+  if (submap_id_to_submap.empty()) {
     return submap_id_to_submap;
   }
 

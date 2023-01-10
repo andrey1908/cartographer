@@ -158,11 +158,8 @@ void AddToProtoGraph(const proto::Submap& submap_data,
       submap_data.submap_id().trajectory_id(), pose_graph);
   auto* submap = trajectory->add_submap();
   submap->set_submap_index(submap_data.submap_id().submap_index());
-  if (submap_data.has_submap_2d()) {
-    *submap->mutable_pose() = submap_data.submap_2d().local_pose();
-  } else {
-    *submap->mutable_pose() = submap_data.submap_3d().local_pose();
-  }
+  CHECK(submap_data.has_submap_3d());
+  *submap->mutable_pose() = submap_data.submap_3d().local_pose();
 }
 
 void AddToProtoGraph(const proto::Constraint& constraint,

@@ -33,7 +33,6 @@ TEST(SubmapsTest, ToFromProto) {
       histogram);
   const proto::Submap proto =
       expected.ToProto(true /* include_probability_grid_data */);
-  EXPECT_FALSE(proto.has_submap_2d());
   EXPECT_TRUE(proto.has_submap_3d());
   const auto actual = Submap3D(proto.submap_3d());
   EXPECT_TRUE(expected.local_pose().translation().isApprox(
