@@ -958,7 +958,7 @@ void PoseGraph3D::HandleWorkQueue(
       bool local, global;
       std::tie(local, global) =
           CheckIfConstraintCanBeAdded(constraint.node_id, constraint.submap_id);
-      CHECK(local != global);
+      CHECK(!(local && global));
       std::ostringstream info;
       if (global) {
         info << "Global. ";
