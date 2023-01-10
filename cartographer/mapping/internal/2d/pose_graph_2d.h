@@ -122,6 +122,7 @@ class PoseGraph2D : public PoseGraph {
       ABSL_LOCKS_EXCLUDED(mutex_);
   common::Time TrajectoriesLastConnectionTime(int trajectory_id_a, int trajectory_id_b) const override
       ABSL_LOCKS_EXCLUDED(mutex_);
+  bool TrajectoriesBelongToTheSameMap(int trajectory_a, int trajectory_b) const override { return false; }
   PoseGraphInterface::SubmapData GetSubmapData(const SubmapId& submap_id) const
       ABSL_LOCKS_EXCLUDED(mutex_) override;
   MapById<SubmapId, PoseGraphInterface::SubmapData> GetAllSubmapData() const

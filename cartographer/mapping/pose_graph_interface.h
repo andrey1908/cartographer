@@ -143,6 +143,8 @@ class PoseGraphInterface {
 
   // Returns latest connection time for trajectories
   virtual common::Time TrajectoriesLastConnectionTime(int trajectory_id_a, int trajectory_id_b) const = 0;
+
+  virtual bool TrajectoriesBelongToTheSameMap(int trajectory_a, int trajectory_b) const = 0;
 };
 
 }  // namespace mapping

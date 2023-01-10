@@ -1571,6 +1571,12 @@ common::Time PoseGraph3D::TrajectoriesLastConnectionTime(
   return trajectory_states_.LastConnectionTime(trajectory_a, trajectory_b);
 }
 
+bool PoseGraph3D::TrajectoriesBelongToTheSameMap(
+    int trajectory_a, int trajectory_b) const {
+  absl::MutexLock locker(&mutex_);
+  return maps_.TrajectoriesBelongToTheSameMap(trajectory_a, trajectory_b);
+}
+
 transform::Rigid3d PoseGraph3D::GetLocalToGlobalTransform(
     int trajectory_id) const {
   absl::MutexLock locker(&mutex_);

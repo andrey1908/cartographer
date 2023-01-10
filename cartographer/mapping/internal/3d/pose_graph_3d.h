@@ -146,6 +146,9 @@ public:
   common::Time TrajectoriesLastConnectionTime(
       int trajectory_a, int trajectory_b) const override
           ABSL_LOCKS_EXCLUDED(mutex_);
+  bool TrajectoriesBelongToTheSameMap(
+      int trajectory_a, int trajectory_b) const override
+          ABSL_LOCKS_EXCLUDED(mutex_);
 
   transform::Rigid3d GetLocalToGlobalTransform(int trajectory_id) const
       ABSL_LOCKS_EXCLUDED(mutex_);
