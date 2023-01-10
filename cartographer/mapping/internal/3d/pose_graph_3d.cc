@@ -91,6 +91,7 @@ void PoseGraph3D::DeleteTrajectoriesIfNeeded() {
         TrimSubmap(submap_it.id);
       }
       trajectory_states_.DeleteTrajectory(trajectory_id);
+      maps_.DeleteTrajectory(trajectory_id);
     }
   }
 }
@@ -161,6 +162,15 @@ std::pair<bool, bool> PoseGraph3D::CheckIfConstraintCanBeAdded(
     const NodeId& node_id, const SubmapId& submap_id) {
   bool local_constraint_can_be_added = false;
   bool global_constraint_can_be_added = false;
+
+  {
+    absl::MutexLock locker(&mutex_);
+    if (node_id.trajectory_id != submap_id.trajectory_id &&
+        !maps_.TrajectoriesBelongToTheSameMap(
+            node_id.trajectory_id, submap_id.trajectory_id)) {
+      return std::make_pair(false, false);
+    }
+  }
 
   common::Time latest_node_time;
   common::Time last_connection_time;
@@ -625,6 +635,9 @@ NodeId PoseGraph3D::AppendNode(
   }
   constraints_.SetTravelledDistance(node_id,
       data_.trajectory_nodes.at(node_id).constant_data->travelled_distance);
+  if (!maps_.ContainsTrajectory(trajectory_id)) {
+    maps_.AddTrajectory("default", trajectory_id);
+  }
   return node_id;
 }
 
@@ -1308,6 +1321,9 @@ void PoseGraph3D::AddSubmapFromProto(
     if (!trajectory_states_.ContainsTrajectory(submap_id.trajectory_id)) {
       trajectory_states_.AddTrajectory(submap_id.trajectory_id);
     }
+    if (!maps_.ContainsTrajectory(submap_id.trajectory_id)) {
+      maps_.AddTrajectory("default", submap_id.trajectory_id);
+    }
     data_.submap_data.Insert(submap_id, InternalSubmapData());
     data_.submap_data.at(submap_id).submap = submap_ptr;
     // Immediately show the submap at the 'global_submap_pose'.
@@ -1345,6 +1361,9 @@ void PoseGraph3D::AddNodeFromProto(
     absl::MutexLock locker(&mutex_);
     if (!trajectory_states_.ContainsTrajectory(node_id.trajectory_id)) {
       trajectory_states_.AddTrajectory(node_id.trajectory_id);
+    }
+    if (!maps_.ContainsTrajectory(node_id.trajectory_id)) {
+      maps_.AddTrajectory("default", node_id.trajectory_id);
     }
     data_.trajectory_nodes.Insert(node_id,
         TrajectoryNode{constant_data, global_pose});
@@ -1446,6 +1465,18 @@ void PoseGraph3D::AddSerializedConstraints(
   });
 }
 
+void PoseGraph3D::AddSerializedMaps(
+    const std::map<std::string, std::set<int>>& maps_data) {
+  AddWorkItem([this, maps_data]()
+        ABSL_LOCKS_EXCLUDED(mutex_)
+        ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
+    absl::MutexLock queue_locker(&executing_work_item_mutex_);
+    absl::MutexLock locker(&mutex_);
+    maps_.UpdateData(maps_data);
+    return WorkItem::Result::kDoNotRunOptimization;
+  });
+}
+
 void PoseGraph3D::AddPureLocalizationTrimmer(int trajectory_id,
     const proto::PureLocalizationTrimmerOptions& pure_localization_trimmer_options) {
   AddWorkItem([this, trajectory_id, pure_localization_trimmer_options]()
@@ -1541,6 +1572,17 @@ transform::Rigid3d PoseGraph3D::GetLocalToGlobalTransform(
     int trajectory_id) const {
   absl::MutexLock locker(&mutex_);
   return ComputeLocalToGlobalTransform(data_.global_submap_poses_3d, trajectory_id);
+}
+
+void PoseGraph3D::MoveTrajectoryToMap(int trajectory_id, const std::string& map_name) {
+  AddWorkItem([this, trajectory_id, map_name]()
+        ABSL_LOCKS_EXCLUDED(mutex_)
+        ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
+    absl::MutexLock queue_locker(&executing_work_item_mutex_);
+    absl::MutexLock locker(&mutex_);
+    maps_.MoveTrajectory(trajectory_id, map_name);
+    return WorkItem::Result::kDoNotRunOptimization;
+  });
 }
 
 PoseGraphInterface::SubmapData PoseGraph3D::GetSubmapData(
@@ -1667,6 +1709,11 @@ std::map<int, PoseGraphInterface::TrajectoryData>
 PoseGraph3D::GetTrajectoryData() const {
   absl::MutexLock locker(&mutex_);
   return optimization_problem_->trajectory_data();
+}
+
+std::map<std::string, std::set<int>> PoseGraph3D::GetMapsData() const {
+  absl::MutexLock locker(&mutex_);
+  return maps_.GetData();
 }
 
 std::vector<Constraint> PoseGraph3D::constraints() const {

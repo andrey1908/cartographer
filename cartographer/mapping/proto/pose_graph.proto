@@ -51,6 +51,14 @@ message Constraint {
   double score = 4;
 }
 
+message PoseGraphMaps {
+  message Map {
+    string name = 1;
+    repeated int32 trajectory_id = 2;
+  }
+  repeated Map map = 1;
+}
+
 message PoseGraph {
   message LandmarkPose {
     string landmark_id = 1;
@@ -60,4 +68,5 @@ message PoseGraph {
   repeated Constraint constraint = 2;
   repeated Trajectory trajectory = 4;
   repeated LandmarkPose landmark_poses = 5;
+  PoseGraphMaps maps = 1;
 }

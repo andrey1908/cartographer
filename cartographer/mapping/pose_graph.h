@@ -44,7 +44,7 @@ proto::PoseGraphOptions CreatePoseGraphOptions(
     common::LuaParameterDictionary* const parameter_dictionary);
 
 class PoseGraph : public PoseGraphInterface {
- public:
+public:
   struct InitialTrajectoryPose {
     int to_trajectory_id;
     transform::Rigid3d relative_pose;
@@ -99,6 +99,9 @@ class PoseGraph : public PoseGraphInterface {
   virtual void AddSerializedConstraints(
       const std::vector<Constraint>& constraints) = 0;
 
+  virtual void AddSerializedMaps(
+      const std::map<std::string, std::set<int>>& maps_data) = 0;
+
   // Add pure localization trimmer.
   virtual void AddPureLocalizationTrimmer(int trajectory_id,
       const proto::PureLocalizationTrimmerOptions& pure_localization_trimmer_options) = 0;
@@ -132,6 +135,8 @@ class PoseGraph : public PoseGraphInterface {
                                         int to_trajectory_id,
                                         const transform::Rigid3d& pose,
                                         const common::Time time) = 0;
+
+  virtual void MoveTrajectoryToMap(int trajectory_id, const std::string& map_name) = 0;
 };
 
 }  // namespace mapping

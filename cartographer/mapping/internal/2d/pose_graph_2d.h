@@ -111,6 +111,8 @@ class PoseGraph2D : public PoseGraph {
   void SetTrajectoryDataFromProto(const proto::TrajectoryData& data) override;
   void AddSerializedConstraints(
       const std::vector<Constraint>& constraints) override;
+  void AddSerializedMaps(
+      const std::map<std::string, std::set<int>>& maps_data) override {};
   void AddLoopTrimmer(int trajectory_id,
       const proto::LoopTrimmerOptions& loop_trimmer_options) override;
   void RunFinalOptimization() override;
@@ -128,6 +130,7 @@ class PoseGraph2D : public PoseGraph {
       ABSL_LOCKS_EXCLUDED(mutex_) override;
   transform::Rigid3d GetLocalToGlobalTransform(int trajectory_id) const
       ABSL_LOCKS_EXCLUDED(mutex_) override;
+  void MoveTrajectoryToMap(int trajectory_id, const std::string& map_name) override {};
   MapById<NodeId, TrajectoryNode> GetTrajectoryNodes() const override
       ABSL_LOCKS_EXCLUDED(mutex_);
   MapById<NodeId, TrajectoryNodePose> GetTrajectoryNodePoses() const override
@@ -150,6 +153,9 @@ class PoseGraph2D : public PoseGraph {
   GetLandmarkNodes() const override ABSL_LOCKS_EXCLUDED(mutex_);
   std::map<int, TrajectoryData> GetTrajectoryData() const override
       ABSL_LOCKS_EXCLUDED(mutex_);
+  std::map<std::string, std::set<int>> GetMapsData() const override
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
+          { return std::map<std::string, std::set<int>>(); }
   std::vector<Constraint> constraints() const override ABSL_LOCKS_EXCLUDED(mutex_);
   void SetInitialTrajectoryPose(int from_trajectory_id, int to_trajectory_id,
                                 const transform::Rigid3d& pose,

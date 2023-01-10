@@ -184,6 +184,10 @@ void MapBuilder::FinishTrajectory(const int trajectory_id) {
   pose_graph_->FinishTrajectory(trajectory_id);
 }
 
+void MapBuilder::MoveTrajectoryToMap(int trajectory_id, const std::string& map_name) {
+  pose_graph_->MoveTrajectoryToMap(trajectory_id, map_name);
+}
+
 std::string MapBuilder::SubmapToProto(
     const SubmapId& submap_id, proto::SubmapQuery::Response* const response) {
   if (submap_id.trajectory_id < 0 ||
@@ -360,6 +364,21 @@ std::map<int, int> MapBuilder::LoadState(
 
   pose_graph_->AddSerializedConstraints(
       FromProto(pose_graph_proto.constraint()));
+
+  if (pose_graph_proto.has_maps()) {
+    std::map<std::string, std::set<int>> maps_data;
+    const auto& maps_proto = pose_graph_proto.maps();
+    for (int i = 0; i < maps_proto.map_size(); i++) {
+      const auto& map = maps_proto.map(i);
+      CHECK(maps_data.count(map.name()) == 0);
+      maps_data[map.name()];
+      for (int j = 0; j < map.trajectory_id_size(); j++) {
+        int new_trajectory_id = trajectory_remapping.at(map.trajectory_id(j));
+        maps_data.at(map.name()).insert(new_trajectory_id);
+      }
+    }
+    pose_graph_->AddSerializedMaps(maps_data);
+  }
 
   const auto& trajectory_states = pose_graph_->GetTrajectoryStates();
   for (const auto& [trajectory_id, trajectory_state] : trajectory_states) {

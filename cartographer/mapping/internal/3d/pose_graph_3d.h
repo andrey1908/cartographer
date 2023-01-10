@@ -38,6 +38,7 @@
 #include "cartographer/mapping/internal/pose_graph_data.h"
 #include "cartographer/mapping/internal/pose_graph_constraints.h"
 #include "cartographer/mapping/internal/pose_graph_trajectory_states.h"
+#include "cartographer/mapping/internal/pose_graph_maps.h"
 #include "cartographer/mapping/internal/work_queue.h"
 #include "cartographer/mapping/pose_graph.h"
 #include "cartographer/metrics/family_factory.h"
@@ -121,6 +122,9 @@ public:
   void AddSerializedConstraints(
       const std::vector<Constraint>& constraints) override
           ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
+  void AddSerializedMaps(
+      const std::map<std::string, std::set<int>>& maps_data) override
+          ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
 
   void AddPureLocalizationTrimmer(int trajectory_id,
       const proto::PureLocalizationTrimmerOptions& pure_localization_trimmer_options) override
@@ -146,6 +150,9 @@ public:
   transform::Rigid3d GetLocalToGlobalTransform(int trajectory_id) const
       ABSL_LOCKS_EXCLUDED(mutex_);
 
+  void MoveTrajectoryToMap(int trajectory_id, const std::string& map_name) override
+      ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
+
   PoseGraph::SubmapData GetSubmapData(const SubmapId& submap_id) const
       ABSL_LOCKS_EXCLUDED(mutex_);
   MapById<SubmapId, SubmapData> GetAllSubmapData() const
@@ -170,6 +177,8 @@ public:
       ABSL_LOCKS_EXCLUDED(mutex_);
   std::map<int, TrajectoryData> GetTrajectoryData() const override
       ABSL_LOCKS_EXCLUDED(mutex_);
+  std::map<std::string, std::set<int>> GetMapsData() const override
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   std::vector<Constraint> constraints() const override
       ABSL_LOCKS_EXCLUDED(mutex_);
 
@@ -354,6 +363,7 @@ private:
   PoseGraphData data_ ABSL_GUARDED_BY(mutex_);
   PoseGraphConstraints constraints_ ABSL_GUARDED_BY(mutex_);
   PoseGraphTrajectoryStates trajectory_states_ ABSL_GUARDED_BY(mutex_);
+  PoseGraphMaps maps_ ABSL_GUARDED_BY(mutex_);
 
   GlobalSlamOptimizationCallback global_slam_optimization_callback_
       ABSL_GUARDED_BY(executing_work_item_mutex_);

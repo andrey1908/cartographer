@@ -155,6 +155,18 @@ proto::PoseGraph PoseGraph::ToProto(bool include_unfinished_submaps) const {
     landmark_proto->set_landmark_id(id_pose.first);
     *landmark_proto->mutable_global_pose() = transform::ToProto(id_pose.second);
   }
+
+  std::map<std::string, std::set<int>> maps_data = GetMapsData();
+  proto::PoseGraphMaps maps_proto;
+  for (const auto& [map_name, trajectory_ids] : maps_data) {
+    auto* map = maps_proto.add_map();
+    map->set_name(map_name);
+    for (int trajectory_id : trajectory_ids) {
+      map->add_trajectory_id(trajectory_id);
+    }
+  }
+  *proto.mutable_maps() = maps_proto;
+
   return proto;
 }
 

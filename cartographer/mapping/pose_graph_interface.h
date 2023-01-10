@@ -101,6 +101,8 @@ class PoseGraphInterface {
   // Returns the states of trajectories.
   virtual std::map<int, TrajectoryState> GetTrajectoryStates() const = 0;
 
+  virtual std::map<std::string, std::set<int>> GetMapsData() const = 0;
+
   // Returns the current optimized landmark poses.
   virtual std::map<std::string, transform::Rigid3d> GetLandmarkPoses()
       const = 0;
