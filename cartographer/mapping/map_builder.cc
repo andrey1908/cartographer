@@ -180,26 +180,21 @@ std::string MapBuilder::SubmapToProto(
 }
 
 void MapBuilder::SerializeState(bool include_unfinished_submaps,
-                                io::ProtoStreamWriterInterface* const writer,
-                                const std::vector<mapping::proto::TrajectoryRosOptions>*
-                                    trajectory_ros_options /* nullptr */) {
+                                io::ProtoStreamWriterInterface* const writer) {
   io::WritePbStream(*pose_graph_, all_trajectory_builder_options_, writer,
-                    include_unfinished_submaps, trajectory_ros_options);
+                    include_unfinished_submaps);
 }
 
 bool MapBuilder::SerializeStateToFile(bool include_unfinished_submaps,
-                                      const std::string& filename,
-                                      const std::vector<mapping::proto::TrajectoryRosOptions>*
-                                          trajectory_ros_options /* nullptr */) {
+                                      const std::string& filename) {
   io::ProtoStreamWriter writer(filename);
   io::WritePbStream(*pose_graph_, all_trajectory_builder_options_, &writer,
-                    include_unfinished_submaps, trajectory_ros_options);
+                    include_unfinished_submaps);
   return (writer.Close());
 }
 
 std::map<int, int> MapBuilder::LoadState(
-    io::ProtoStreamReaderInterface* const reader, bool load_frozen_state,
-    std::vector<mapping::proto::TrajectoryRosOptions>* trajectory_ros_options /* nullptr */) {
+    io::ProtoStreamReaderInterface* const reader, bool load_frozen_state) {
   io::ProtoStreamDeserializer deserializer(reader);
 
   // Create a copy of the pose_graph_proto, such that we can re-write the
@@ -320,14 +315,6 @@ std::map<int, int> MapBuilder::LoadState(
             sensor::FromProto(proto.landmark_data().landmark_data()));
         break;
       }
-      case SerializedData::kTrajectoryRosOptions: {
-        if (trajectory_ros_options) {
-          proto.mutable_trajectory_ros_options()->set_trajectory_id(
-              trajectory_remapping.at(proto.trajectory_ros_options().trajectory_id()));
-          trajectory_ros_options->push_back(proto.trajectory_ros_options());
-        }
-        break;
-      }
       default:
         LOG(WARNING) << "Skipping unknown message type in stream: "
                      << proto.GetTypeName();
@@ -366,8 +353,7 @@ std::map<int, int> MapBuilder::LoadState(
 }
 
 std::map<int, int> MapBuilder::LoadStateFromFile(
-    const std::string& state_filename, const bool load_frozen_state,
-    std::vector<mapping::proto::TrajectoryRosOptions>* trajectory_ros_options /* nullptr */) {
+    const std::string& state_filename, const bool load_frozen_state) {
   const std::string suffix = ".pbstream";
   if (state_filename.substr(
           std::max<int>(state_filename.size() - suffix.size(), 0)) != suffix) {
@@ -376,7 +362,7 @@ std::map<int, int> MapBuilder::LoadStateFromFile(
   }
   LOG(INFO) << "Loading saved state '" << state_filename << "'...";
   io::ProtoStreamReader stream(state_filename);
-  return LoadState(&stream, load_frozen_state, trajectory_ros_options);
+  return LoadState(&stream, load_frozen_state);
 }
 
 std::unique_ptr<MapBuilderInterface> CreateMapBuilder(

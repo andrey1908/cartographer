@@ -110,7 +110,6 @@ void MigrateStreamVersion(
   MapById<NodeId, proto::Node> node_id_to_node;
 
   SerializedData proto;
-  std::vector<proto::TrajectoryRosOptions> trajectory_ros_options;
   while (deserializer.ReadNextSerializedData(&proto)) {
     switch (proto.data_case()) {
       case SerializedData::kPoseGraph:
@@ -162,10 +161,6 @@ void MigrateStreamVersion(
             sensor::FromProto(proto.landmark_data().landmark_data()));
         break;
       }
-      case SerializedData::kTrajectoryRosOptions: {
-        trajectory_ros_options.push_back(proto.trajectory_ros_options());
-        break;
-      }
       default:
         LOG(WARNING) << "Skipping unknown message type in stream: "
                      << proto.GetTypeName();
@@ -191,7 +186,7 @@ void MigrateStreamVersion(
   CHECK(input->eof());
 
   WritePbStream(pose_graph, trajectory_builder_options, output,
-                include_unfinished_submaps, &trajectory_ros_options);
+                include_unfinished_submaps);
 }
 
 MapById<SubmapId, proto::Submap> AddHistogramsToSubmaps(

@@ -55,24 +55,16 @@ class MapBuilder : public MapBuilderInterface {
                             proto::SubmapQuery::Response *response) override;
 
   void SerializeState(bool include_unfinished_submaps,
-                      io::ProtoStreamWriterInterface *writer,
-                      const std::vector<mapping::proto::TrajectoryRosOptions>*
-                          trajectory_ros_options = nullptr) override;
+                      io::ProtoStreamWriterInterface *writer) override;
 
   bool SerializeStateToFile(bool include_unfinished_submaps,
-                            const std::string &filename,
-                            const std::vector<mapping::proto::TrajectoryRosOptions>*
-                                trajectory_ros_options = nullptr) override;
+                            const std::string &filename) override;
 
   std::map<int, int> LoadState(io::ProtoStreamReaderInterface *reader,
-                               bool load_frozen_state,
-                               std::vector<mapping::proto::TrajectoryRosOptions>*
-                                  trajectory_ros_options = nullptr) override;
+                               bool load_frozen_state) override;
 
   std::map<int, int> LoadStateFromFile(const std::string &filename,
-                                       const bool load_frozen_state,
-                                       std::vector<mapping::proto::TrajectoryRosOptions>*
-                                          trajectory_ros_options = nullptr) override;
+                                       const bool load_frozen_state) override;
 
   mapping::PoseGraphInterface *pose_graph() override {
     return pose_graph_.get();

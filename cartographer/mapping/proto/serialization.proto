@@ -21,7 +21,6 @@ import "cartographer/mapping/proto/submap.proto";
 import "cartographer/mapping/proto/trajectory_node_data.proto";
 import "cartographer/sensor/proto/sensor.proto";
 import "cartographer/mapping/proto/trajectory_builder_options.proto";
-import "cartographer/mapping/proto/trajectory_ros_options.proto";
 import "cartographer/transform/proto/transform.proto";
 
 message Submap {
@@ -86,6 +85,6 @@ message SerializedData {
     OdometryData odometry_data = 7;
     FixedFramePoseData fixed_frame_pose_data = 8;
     LandmarkData landmark_data = 9;
-    TrajectoryRosOptions trajectory_ros_options = 10;
   }
+  reserved 10;  // trajectory_ros_options
 }
