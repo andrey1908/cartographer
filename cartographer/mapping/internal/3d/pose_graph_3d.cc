@@ -787,12 +787,16 @@ void PoseGraph3D::TrimPureLocalizationTrajectories() {
     }
     int num_submaps = submap_data.SizeOfTrajectoryOrZero(trajectory_id);
     int i = 0;
+    std::vector<SubmapId> submaps_to_trim;
     for (const auto& it : submap_data.trajectory(trajectory_id)) {
       if (i + options.max_submaps_to_keep() >= num_submaps) {
         break;
       }
-      TrimSubmap(it.id);
+      submaps_to_trim.push_back(it.id);
       i++;
+    }
+    for (const auto& submap : submaps_to_trim) {
+      TrimSubmap(submap);
     }
     if (options.max_submaps_to_keep() == 0) {
       if (trajectory_states_.IsTrajectoryTransitionNone(trajectory_id)) {
@@ -991,7 +995,7 @@ void PoseGraph3D::HandleWorkQueue(
       UpdateTrajectoryConnectivity(constraint);
     }
   }
-  
+
   TrimPureLocalizationTrajectories();
   num_nodes_since_last_loop_closure_ = 0;
 
