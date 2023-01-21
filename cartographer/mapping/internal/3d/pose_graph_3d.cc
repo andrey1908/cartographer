@@ -87,8 +87,12 @@ void PoseGraph3D::DeleteTrajectoriesIfNeeded() {
   const auto& submap_data = optimization_problem_->submap_data();
   for (const auto& [trajectory_id, trajectory_state] : trajectory_states_) {
     if (trajectory_states_.IsTrajectoryReadyForDeletion(trajectory_id)) {
+      std::vector<SubmapId> submaps_to_trim;
       for (const auto& submap_it : submap_data.trajectory(trajectory_id)) {
-        TrimSubmap(submap_it.id);
+        submaps_to_trim.emplace_back(submap_it.id);
+      }
+      for (const auto& submap : submaps_to_trim) {
+        TrimSubmap(submap);
       }
       trajectory_states_.DeleteTrajectory(trajectory_id);
       maps_.DeleteTrajectory(trajectory_id);
