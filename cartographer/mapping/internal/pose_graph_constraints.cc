@@ -17,6 +17,16 @@ void PoseGraphConstraints::SetFirstNodeIdForSubmap(
   first_node_id_for_submap_.emplace(submap_id, first_node_id);
 }
 
+void PoseGraphConstraints::FixNode(const NodeId& node_id) {
+  auto emplace_result =
+      trajectory_fixed_node_.emplace(node_id.trajectory_id, node_id);
+  const bool& emplaced = emplace_result.second;
+  if (!emplaced) {
+    auto& it = emplace_result.first;
+    it->second = std::max(it->second, node_id);
+  }
+}
+
 double PoseGraphConstraints::GetTravelledDistanceWithLoops(
     const NodeId& node_1, const NodeId& node_2, float min_score) {
   if (node_1.trajectory_id == node_2.trajectory_id) {
@@ -126,6 +136,19 @@ double PoseGraphConstraints::GetTravelledDistanceWithLoopsDifferentTrajectories(
         GetTravelledDistanceWithLoopsSameTrajectory(node_1, loop_node_1, min_score) +
         GetTravelledDistanceWithLoopsSameTrajectory(node_2, loop_node_2, min_score);
     travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
+  }
+
+  auto fixed_node_1_it = trajectory_fixed_node_.find(node_1.trajectory_id);
+  if (fixed_node_1_it != trajectory_fixed_node_.end()) {
+    const NodeId& fixed_node_1 = fixed_node_1_it->second;
+    travelled_distance = std::min(travelled_distance,
+        std::abs(travelled_distance_.at(fixed_node_1) - travelled_distance_.at(node_1)));
+  }
+  auto fixed_node_2_it = trajectory_fixed_node_.find(node_2.trajectory_id);
+  if (fixed_node_2_it != trajectory_fixed_node_.end()) {\
+    const NodeId& fixed_node_2 = fixed_node_2_it->second;
+    travelled_distance = std::min(travelled_distance,
+        std::abs(travelled_distance_.at(fixed_node_2) - travelled_distance_.at(node_2)));
   }
   return travelled_distance;
 }

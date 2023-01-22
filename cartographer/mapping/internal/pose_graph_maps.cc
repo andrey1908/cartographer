@@ -58,6 +58,12 @@ bool PoseGraphMaps::TrajectoriesBelongToTheSameMap(
       trajectory_id_to_map_.at(trajectory_b);
 }
 
+std::string PoseGraphMaps::GetMapName(int trajectory_id) const {
+  CHECK(ContainsTrajectory(trajectory_id));
+  int map_id = trajectory_id_to_map_.at(trajectory_id);
+  return map_id_to_name_.at(map_id);
+}
+
 void PoseGraphMaps::UpdateData(const std::map<std::string, std::set<int>>& data) {
   for (const auto& [map_name, trajectory_ids] : data) {
     for (int trajectory_id : trajectory_ids) {

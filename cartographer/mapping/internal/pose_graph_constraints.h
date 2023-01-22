@@ -63,6 +63,8 @@ public:
   void SetFirstNodeIdForSubmap(
       const NodeId& first_node_id, const SubmapId& submap_id);
 
+  void FixNode(const NodeId& node_id);
+
   const std::vector<Constraint>& constraints() const {
     return constraints_;
   }
@@ -129,6 +131,7 @@ private:
   std::vector<Constraint> constraints_;
   std::vector<TrimmedLoop> loops_from_trimmed_submaps_;
   std::map<NodeId, double> travelled_distance_;
+  std::map<int, NodeId> trajectory_fixed_node_;
   std::map<SubmapId, NodeId> first_node_id_for_submap_;
   std::map<int, int> last_loop_submap_index_for_trajectory_;
   std::map<int, int> last_loop_node_index_for_trajectory_;

@@ -1597,6 +1597,13 @@ void PoseGraph3D::MoveTrajectoryToMap(int trajectory_id, const std::string& map_
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
+    if (data_.trajectory_nodes.SizeOfTrajectoryOrZero(trajectory_id) &&
+        maps_.GetMapName(trajectory_id) != "default") {
+      // if last_node_id is 'const NodeId&', it does not work
+      NodeId last_node_id =
+          std::prev(data_.trajectory_nodes.EndOfTrajectory(trajectory_id))->id;
+      constraints_.FixNode(last_node_id);
+    }
     maps_.MoveTrajectory(trajectory_id, map_name);
     return WorkItem::Result::kDoNotRunOptimization;
   });

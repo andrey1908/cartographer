@@ -18,6 +18,8 @@ public:
   void RenameMap(const std::string& old_map_name, const std::string& new_map_name);
   bool TrajectoriesBelongToTheSameMap(int trajectory_a, int trajectory_b) const;
 
+  std::string GetMapName(int trajectory_id) const;
+
   void UpdateData(const std::map<std::string, std::set<int>>& data);
   std::map<std::string, std::set<int>> GetData() const;
 
