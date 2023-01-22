@@ -1,5 +1,7 @@
 #include "cartographer/mapping/internal/pose_graph_constraints.h"
 
+#include <type_traits>
+
 namespace cartographer {
 namespace mapping {
 
@@ -13,27 +15,6 @@ void PoseGraphConstraints::SetFirstNodeIdForSubmap(
       const NodeId& first_node_id, const SubmapId& submap_id) {
   CHECK(first_node_id_for_submap_.count(submap_id) == 0);
   first_node_id_for_submap_.emplace(submap_id, first_node_id);
-}
-
-void PoseGraphConstraints::UpdateLastLoopIndices(const Constraint& loop) {
-  CHECK(loop.tag == Constraint::INTER_SUBMAP);
-  auto submap_it =
-      last_loop_submap_index_for_trajectory_.find(loop.submap_id.trajectory_id);
-  if (submap_it != last_loop_submap_index_for_trajectory_.end()) {
-    submap_it->second = std::max(submap_it->second, loop.submap_id.submap_index);
-  } else {
-    last_loop_submap_index_for_trajectory_.emplace(
-        loop.submap_id.trajectory_id, loop.submap_id.submap_index);
-  }
-
-  auto node_it =
-      last_loop_node_index_for_trajectory_.find(loop.node_id.trajectory_id);
-  if (node_it != last_loop_node_index_for_trajectory_.end()) {
-    node_it->second = std::max(node_it->second, loop.node_id.node_index);
-  } else {
-    last_loop_node_index_for_trajectory_.emplace(
-        loop.node_id.trajectory_id, loop.node_id.node_index);
-  }
 }
 
 double PoseGraphConstraints::GetTravelledDistanceWithLoops(
@@ -98,6 +79,7 @@ double PoseGraphConstraints::GetTravelledDistanceWithLoopsDifferentTrajectories(
   if (node_2 < node_1) {
     std::swap(node_1, node_2);
   }
+
   double travelled_distance = std::numeric_limits<double>::max();
   for (const Constraint& loop : constraints_) {
     if (loop.tag == Constraint::INTRA_SUBMAP) {
@@ -123,6 +105,7 @@ double PoseGraphConstraints::GetTravelledDistanceWithLoopsDifferentTrajectories(
         GetTravelledDistanceWithLoopsSameTrajectory(node_2, loop_node_2, min_score);
     travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
   }
+
   for (const TrimmedLoop& loop : loops_from_trimmed_submaps_) {
     if (loop.score < min_score) {
       continue;

@@ -42,6 +42,9 @@ public:
     last_loop_submap_index_for_trajectory_.clear();
     last_loop_node_index_for_trajectory_.clear();
     constraints_ = std::forward<T>(constraints);
+    for (const TrimmedLoop& trimmed_loop : loops_from_trimmed_submaps_) {
+      UpdateLastLoopIndices(trimmed_loop);
+    }
     for (const Constraint& loop : constraints_) {
       if (loop.tag != Constraint::INTER_SUBMAP) {
         continue;
@@ -91,7 +94,32 @@ public:
   }
 
 private:
-  void UpdateLastLoopIndices(const Constraint& loop);
+  template<typename T>
+  void UpdateLastLoopIndices(const T& loop) {
+    constexpr bool isConstraint = std::is_same<T, Constraint>::value;
+    if constexpr (isConstraint) {
+      CHECK(loop.tag == Constraint::INTER_SUBMAP);
+    }
+
+    auto submap_it =
+        last_loop_submap_index_for_trajectory_.find(loop.submap_id.trajectory_id);
+    if (submap_it != last_loop_submap_index_for_trajectory_.end()) {
+      submap_it->second = std::max(submap_it->second, loop.submap_id.submap_index);
+    } else {
+      last_loop_submap_index_for_trajectory_.emplace(
+          loop.submap_id.trajectory_id, loop.submap_id.submap_index);
+    }
+
+    auto node_it =
+        last_loop_node_index_for_trajectory_.find(loop.node_id.trajectory_id);
+    if (node_it != last_loop_node_index_for_trajectory_.end()) {
+      node_it->second = std::max(node_it->second, loop.node_id.node_index);
+    } else {
+      last_loop_node_index_for_trajectory_.emplace(
+          loop.node_id.trajectory_id, loop.node_id.node_index);
+    }
+  }
+
   double GetTravelledDistanceWithLoopsSameTrajectory(
       NodeId node_1, NodeId node_2, float min_score);
   double GetTravelledDistanceWithLoopsDifferentTrajectories(
