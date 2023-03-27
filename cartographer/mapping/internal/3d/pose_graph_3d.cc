@@ -909,14 +909,14 @@ void PoseGraph3D::TrimLoopsInWindow() {
       int window_first_node_index =
           connected_nodes.BeginOfTrajectory(trajectory_id)->id.node_index;
       NodeId node_id_to_retain(-1, -1);
-      float max_score = std::numeric_limits<float>::min();
+      float max_score = std::numeric_limits<float>::lowest();
       for (const auto& connected_node : connected_nodes.trajectory(trajectory_id)) {
         const NodeId& node_id = connected_node.id;
         float score = connected_node.data;
         if (node_id.node_index >= window_first_node_index + loop_trimmer_options.window_size_per_submap()) {
           loops_to_remove.erase(std::make_pair(submap_id, node_id_to_retain));
           window_first_node_index = node_id.node_index;
-          max_score = std::numeric_limits<float>::min();
+          max_score = std::numeric_limits<float>::lowest();
         }
         if (score > max_score) {
           node_id_to_retain = node_id;
