@@ -70,7 +70,7 @@ public:
   }
 
   double GetTravelledDistanceWithLoops(
-      const NodeId& node_1, const NodeId& node_2, float min_score);
+      const NodeId& node_1, const NodeId& node_2, float min_score) const;
   bool IsLoopLast(const Constraint& loop);
 
   std::vector<Constraint>::iterator begin() {
@@ -123,9 +123,9 @@ private:
   }
 
   double GetTravelledDistanceWithLoopsSameTrajectory(
-      NodeId node_1, NodeId node_2, float min_score);
+      NodeId node_1, NodeId node_2, float min_score) const;
   double GetTravelledDistanceWithLoopsDifferentTrajectories(
-      NodeId node_1, NodeId node_2, float min_score);
+      NodeId node_1, NodeId node_2, float min_score) const;
 
 private:
   std::vector<Constraint> constraints_;

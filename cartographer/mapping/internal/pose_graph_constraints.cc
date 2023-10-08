@@ -28,7 +28,7 @@ void PoseGraphConstraints::FixNode(const NodeId& node_id) {
 }
 
 double PoseGraphConstraints::GetTravelledDistanceWithLoops(
-    const NodeId& node_1, const NodeId& node_2, float min_score) {
+    const NodeId& node_1, const NodeId& node_2, float min_score) const {
   if (node_1.trajectory_id == node_2.trajectory_id) {
     return GetTravelledDistanceWithLoopsSameTrajectory(node_1, node_2, min_score);
   } else {
@@ -37,7 +37,7 @@ double PoseGraphConstraints::GetTravelledDistanceWithLoops(
 }
 
 double PoseGraphConstraints::GetTravelledDistanceWithLoopsSameTrajectory(
-    NodeId node_1, NodeId node_2, float min_score) {
+    NodeId node_1, NodeId node_2, float min_score) const {
   CHECK(node_1.trajectory_id == node_2.trajectory_id);
   if (node_1 == node_2) {
     return 0.0;
@@ -47,8 +47,9 @@ double PoseGraphConstraints::GetTravelledDistanceWithLoopsSameTrajectory(
   }
   CHECK(travelled_distance_.count(node_1));
   CHECK(travelled_distance_.count(node_2));
-  double travelled_distance =
-      travelled_distance_.at(node_2) - travelled_distance_.at(node_1);
+  double travelled_distance_at_node_1 = travelled_distance_.at(node_1);
+  double travelled_distance_at_node_2 = travelled_distance_.at(node_2);
+  double travelled_distance = travelled_distance_at_node_2 - travelled_distance_at_node_1;
   CHECK(travelled_distance >= 0.0);
   for (const Constraint& loop : constraints_) {
     if (loop.tag == Constraint::INTRA_SUBMAP) {
@@ -76,15 +77,15 @@ double PoseGraphConstraints::GetTravelledDistanceWithLoopsSameTrajectory(
     CHECK(travelled_distance_.count(loop_node_1));
     CHECK(travelled_distance_.count(loop_node_2));
     double travelled_distance_with_loop =
-        std::abs(travelled_distance_.at(loop_node_1) - travelled_distance_.at(node_1)) +
-        std::abs(travelled_distance_.at(loop_node_2) - travelled_distance_.at(node_2));
+        std::abs(travelled_distance_.at(loop_node_1) - travelled_distance_at_node_1) +
+        std::abs(travelled_distance_.at(loop_node_2) - travelled_distance_at_node_2);
     travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
   }
   return travelled_distance;
 }
 
 double PoseGraphConstraints::GetTravelledDistanceWithLoopsDifferentTrajectories(
-    NodeId node_1, NodeId node_2, float min_score) {
+    NodeId node_1, NodeId node_2, float min_score) const {
   CHECK(node_1.trajectory_id != node_2.trajectory_id);
   if (node_2 < node_1) {
     std::swap(node_1, node_2);
