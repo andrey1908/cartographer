@@ -182,7 +182,10 @@ std::pair<bool, bool> PoseGraph3D::CheckIfConstraintCanBeAdded(
   {
     absl::MutexLock locker(&mutex_);
     CHECK(data_.submap_data.at(submap_id).state == SubmapState::kFinished);
-    CHECK(data_.submap_data.at(submap_id).submap->insertion_finished());
+    if (!data_.submap_data.at(submap_id).submap->insertion_finished()) {
+      // this happens when unfinished submap was loaded from file
+      return std::make_pair(false, false);
+    }
     latest_node_time = GetLatestNodeTime(node_id, submap_id);
     last_connection_time = trajectory_states_.LastConnectionTime(
         node_id.trajectory_id, submap_id.trajectory_id);
