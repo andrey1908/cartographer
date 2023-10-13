@@ -1133,6 +1133,10 @@ void PoseGraph3D::HandleWorkQueue(
   {
     absl::MutexLock locker(&mutex_);
     for (const NodeId& node_to_trim : nodes_scheduled_to_trim_) {
+      if (trajectory_states_.IsTrajectoryFrozen(node_to_trim.trajectory_id)) {
+        continue;
+      }
+
       bool submaps_for_node_are_not_finished = false;
       for (const SubmapId& submap_id : data_.trajectory_nodes.at(node_to_trim).submap_ids) {
         if (data_.submap_data.at(submap_id).state == SubmapState::kNoConstraintSearch) {
