@@ -1242,7 +1242,7 @@ void PoseGraph3D::DrainWorkQueue() {
       }
       auto add_time = work_queue_->front().time;
       auto now_time = std::chrono::steady_clock::now();
-      work_item_processing_latency.AddMeasurement(common::ToSeconds(now_time - add_time));
+      work_item_processing_latency.addMeasurement(common::ToSeconds(now_time - add_time));
       work_item = work_queue_->front().task;
       work_queue_->pop_front();
       work_queue_size = work_queue_->size();

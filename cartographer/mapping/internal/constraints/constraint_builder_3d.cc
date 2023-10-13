@@ -195,13 +195,8 @@ void ConstraintBuilder3D::ComputeConstraint(
     const transform::Rigid3d& global_submap_pose,
     const SubmapScanMatcher& submap_scan_matcher,
     std::unique_ptr<Constraint>* constraint) {
-  static time_measurer::TimeMeasurer compute_successful_global_constraint_time_measurer("compute_successful_global_constraint", true);
-  static time_measurer::TimeMeasurer compute_successful_local_constraint_time_measurer("compute_successful_local_constraint", true);
-  if (match_full_submap) {
-    compute_successful_global_constraint_time_measurer.StartMeasurement();
-  } else {
-    compute_successful_local_constraint_time_measurer.StartMeasurement();
-  }
+  MEASURE_TIME_FROM_HERE(compute_successful_global_constraint);
+  MEASURE_TIME_FROM_HERE(compute_successful_local_constraint);
   // LOG(INFO) << "Try to compute constraint between node and submap: " << node_id << ", " << submap_id;
   CHECK(submap_scan_matcher.fast_correlative_scan_matcher);
   // The 'constraint_transform' (submap i <- node j) is computed from:
@@ -303,9 +298,9 @@ void ConstraintBuilder3D::ComputeConstraint(
   }
 
   if (match_full_submap) {
-    compute_successful_global_constraint_time_measurer.StopMeasurement();
+    STOP_TIME_MEASUREMENT(compute_successful_global_constraint);
   } else {
-    compute_successful_local_constraint_time_measurer.StopMeasurement();
+    STOP_TIME_MEASUREMENT(compute_successful_local_constraint);
   }
 }
 
