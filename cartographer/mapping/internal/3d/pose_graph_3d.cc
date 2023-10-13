@@ -904,53 +904,6 @@ void PoseGraph3D::TrimNode(const NodeId& node_id) {
   }
 }
 
-void PoseGraph3D::TrimPureLocalizationTrajectories() {
-  const auto& submap_data = optimization_problem_->submap_data();
-  absl::MutexLock locker(&mutex_);
-  for (auto& [trajectory_id, options] : pure_localization_trimmer_options_) {
-    if (!trajectory_states_.ContainsTrajectory(trajectory_id)) {
-      continue;
-    }
-    if (trajectory_states_.IsTrajectoryDeleted(trajectory_id)) {
-      continue;
-    }
-    CHECK(!trajectory_states_.IsTrajectoryReadyForDeletion(trajectory_id));
-    if (trajectory_states_.IsTrajectoryFinished(trajectory_id)) {
-      options.set_max_submaps_to_keep(0);
-    }
-    int num_submaps = submap_data.SizeOfTrajectoryOrZero(trajectory_id);
-    int i = 0;
-    std::vector<SubmapId> submaps_to_trim;
-    for (const auto& it : submap_data.trajectory(trajectory_id)) {
-      if (i + options.max_submaps_to_keep() >= num_submaps) {
-        break;
-      }
-      submaps_to_trim.push_back(it.id);
-      i++;
-    }
-    for (const auto& submap : submaps_to_trim) {
-      TrimSubmap(submap);
-    }
-    if (options.max_submaps_to_keep() == 0) {
-      if (trajectory_states_.IsTrajectoryTransitionNone(trajectory_id)) {
-        trajectory_states_.ScheduleTrajectoryForDeletion(trajectory_id);
-      }
-      if (trajectory_states_.IsTrajectoryScheduledForDeletion(trajectory_id)) {
-        trajectory_states_.PrepareTrajectoryForDeletion(trajectory_id);
-      }
-      trajectory_states_.DeleteTrajectory(trajectory_id);
-    }
-  }
-  for (auto it = pure_localization_trimmer_options_.begin();
-      it != pure_localization_trimmer_options_.end();) {
-    if (it->second.max_submaps_to_keep() == 0) {
-      it = pure_localization_trimmer_options_.erase(it);
-    } else {
-      ++it;
-    }
-  }
-}
-
 std::vector<Constraint>
 PoseGraph3D::TrimFalseDetectedLoops(const std::vector<Constraint>& new_loops) {
   absl::MutexLock locker(&mutex_);
@@ -1087,6 +1040,76 @@ PoseGraph3D::TrimLoops(const std::vector<Constraint>& new_loops) {
   return true_detected_loops;
 }
 
+void PoseGraph3D::TrimPureLocalizationTrajectories() {
+  const auto& submap_data = optimization_problem_->submap_data();
+  absl::MutexLock locker(&mutex_);
+  for (auto& [trajectory_id, options] : pure_localization_trimmer_options_) {
+    if (!trajectory_states_.ContainsTrajectory(trajectory_id)) {
+      continue;
+    }
+    if (trajectory_states_.IsTrajectoryDeleted(trajectory_id)) {
+      continue;
+    }
+    CHECK(!trajectory_states_.IsTrajectoryReadyForDeletion(trajectory_id));
+    if (trajectory_states_.IsTrajectoryFinished(trajectory_id)) {
+      options.set_max_submaps_to_keep(0);
+    }
+    int num_submaps = submap_data.SizeOfTrajectoryOrZero(trajectory_id);
+    int i = 0;
+    std::vector<SubmapId> submaps_to_trim;
+    for (const auto& it : submap_data.trajectory(trajectory_id)) {
+      if (i + options.max_submaps_to_keep() >= num_submaps) {
+        break;
+      }
+      submaps_to_trim.push_back(it.id);
+      i++;
+    }
+    for (const auto& submap : submaps_to_trim) {
+      TrimSubmap(submap);
+    }
+    if (options.max_submaps_to_keep() == 0) {
+      if (trajectory_states_.IsTrajectoryTransitionNone(trajectory_id)) {
+        trajectory_states_.ScheduleTrajectoryForDeletion(trajectory_id);
+      }
+      if (trajectory_states_.IsTrajectoryScheduledForDeletion(trajectory_id)) {
+        trajectory_states_.PrepareTrajectoryForDeletion(trajectory_id);
+      }
+      trajectory_states_.DeleteTrajectory(trajectory_id);
+    }
+  }
+  for (auto it = pure_localization_trimmer_options_.begin();
+      it != pure_localization_trimmer_options_.end();) {
+    if (it->second.max_submaps_to_keep() == 0) {
+      it = pure_localization_trimmer_options_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
+void PoseGraph3D::TrimScheduledNodes() {
+  absl::MutexLock locker(&mutex_);
+  for (const NodeId& node_to_trim : nodes_scheduled_to_trim_) {
+    if (trajectory_states_.IsTrajectoryFrozen(node_to_trim.trajectory_id)) {
+      continue;
+    }
+
+    bool submaps_for_node_are_not_finished = false;
+    for (const SubmapId& submap_id : data_.trajectory_nodes.at(node_to_trim).submap_ids) {
+      if (data_.submap_data.at(submap_id).state == SubmapState::kNoConstraintSearch) {
+        submaps_for_node_are_not_finished = true;
+        break;
+      }
+    }
+    if (submaps_for_node_are_not_finished) {
+      continue;
+    }
+
+    TrimNode(node_to_trim);
+  }
+  nodes_scheduled_to_trim_.clear();
+}
+
 void PoseGraph3D::HandleWorkQueue(
     const constraints::ConstraintBuilder3D::Result& result) {
   absl::MutexLock queue_locker(&executing_work_item_mutex_);
@@ -1130,27 +1153,7 @@ void PoseGraph3D::HandleWorkQueue(
   }
 
   TrimPureLocalizationTrajectories();
-  {
-    absl::MutexLock locker(&mutex_);
-    for (const NodeId& node_to_trim : nodes_scheduled_to_trim_) {
-      if (trajectory_states_.IsTrajectoryFrozen(node_to_trim.trajectory_id)) {
-        continue;
-      }
-
-      bool submaps_for_node_are_not_finished = false;
-      for (const SubmapId& submap_id : data_.trajectory_nodes.at(node_to_trim).submap_ids) {
-        if (data_.submap_data.at(submap_id).state == SubmapState::kNoConstraintSearch) {
-          submaps_for_node_are_not_finished = true;
-          break;
-        }
-      }
-      if (submaps_for_node_are_not_finished) {
-        continue;
-      }
-      TrimNode(node_to_trim);
-    }
-    nodes_scheduled_to_trim_.clear();
-  }
+  TrimScheduledNodes();
   num_nodes_since_last_loop_closure_ = 0;
 
   {

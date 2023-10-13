@@ -235,10 +235,6 @@ private:
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
 
-  void TrimPureLocalizationTrajectories()
-      ABSL_LOCKS_EXCLUDED(mutex_)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
-
   std::vector<Constraint> TrimFalseDetectedLoops(
       const std::vector<Constraint>& new_loops)
           ABSL_LOCKS_EXCLUDED(mutex_)
@@ -250,6 +246,13 @@ private:
       const std::vector<Constraint>& new_loops)
           ABSL_LOCKS_EXCLUDED(mutex_)
           ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+
+  void TrimPureLocalizationTrajectories()
+      ABSL_LOCKS_EXCLUDED(mutex_)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+  void TrimScheduledNodes()
+      ABSL_LOCKS_EXCLUDED(mutex_)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
 
   std::pair<bool, bool> CheckIfConstraintCanBeAdded(
       const NodeId& node_id, const SubmapId& submap_id)
