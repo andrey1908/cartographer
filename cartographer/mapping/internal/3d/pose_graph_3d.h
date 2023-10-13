@@ -101,6 +101,11 @@ public:
   bool IsTrajectoryFrozen(int trajectory_id) const override
       ABSL_LOCKS_EXCLUDED(mutex_);
 
+  void ScheduleNodesToTrim(const std::set<common::Time>& nodes_to_trim) override
+      ABSL_LOCKS_EXCLUDED(mutex_);
+  void ScheduleNodesToTrim(const std::set<NodeId>& nodes_to_trim) override
+      ABSL_LOCKS_EXCLUDED(mutex_);
+
   void AddSubmapFromProto(
       const transform::Rigid3d& global_submap_pose,
       const proto::Submap& submap) override
@@ -218,6 +223,15 @@ private:
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
 
   void TrimSubmap(const SubmapId& submap_id)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+  void ReattachLoop(Constraint& loop, const NodeId& to_node_id)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+  void ReattachLoop(Constraint& loop, const SubmapId& to_submap_id)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+  void TrimNode(const NodeId& node_id)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
 
@@ -362,6 +376,8 @@ private:
       ABSL_GUARDED_BY(executing_work_item_mutex_);
   std::set<SubmapId> submaps_used_for_global_constraints_
       ABSL_GUARDED_BY(executing_work_item_mutex_);
+
+  std::set<NodeId> nodes_scheduled_to_trim_ ABSL_GUARDED_BY(mutex_);
 
   PoseGraphData data_ ABSL_GUARDED_BY(mutex_);
   PoseGraphConstraints constraints_ ABSL_GUARDED_BY(mutex_);

@@ -121,6 +121,9 @@ class PoseGraphInterface {
   // Checks if the given trajectory is frozen.
   virtual bool IsTrajectoryFrozen(int trajectory_id) const = 0;
 
+  virtual void ScheduleNodesToTrim(const std::set<NodeId>& nodes_to_trim) = 0;
+  virtual void ScheduleNodesToTrim(const std::set<common::Time>& nodes_to_trim) = 0;
+
   // Returns the trajectory data.
   virtual std::map<int, TrajectoryData> GetTrajectoryData() const = 0;
 
