@@ -695,6 +695,7 @@ void PoseGraph3D::UpdateTrajectoryConnectivity(const Constraint& constraint) {
 void PoseGraph3D::TrimSubmap(const SubmapId& submap_id) {
   // TODO(hrapp): We have to make sure that the trajectory has been finished
   // if we want to delete the last submaps.
+  CHECK(data_.submap_data.Contains(submap_id));
   CHECK(data_.submap_data.at(submap_id).state == SubmapState::kFinished);
 
   for (const NodeId& node_id : data_.submap_data.at(submap_id).node_ids) {
@@ -796,6 +797,8 @@ void PoseGraph3D::ReattachLoop(Constraint& loop, const SubmapId& to_submap_id) {
 
 void PoseGraph3D::TrimNode(const NodeId& node_id) {
   MEASURE_BLOCK_TIME(TrimNode);
+
+  CHECK(data_.trajectory_nodes.Contains(node_id));
   for (const SubmapId& submap_id : data_.trajectory_nodes.at(node_id).submap_ids) {
     CHECK(data_.submap_data.at(submap_id).state == SubmapState::kFinished);
   }
@@ -1093,6 +1096,11 @@ void PoseGraph3D::TrimPureLocalizationTrajectories() {
 void PoseGraph3D::TrimScheduledNodes() {
   absl::MutexLock locker(&mutex_);
   for (const NodeId& node_to_trim : nodes_scheduled_to_trim_) {
+    if (!data_.trajectory_nodes.Contains(node_to_trim)) {
+      std::cout << "\n\n\n\nNode already trimmed\n\n\n\n";
+      continue;
+    }
+
     if (trajectory_states_.IsTrajectoryFrozen(node_to_trim.trajectory_id)) {
       continue;
     }
@@ -1472,7 +1480,6 @@ bool PoseGraph3D::IsTrajectoryFrozen(int trajectory_id) const {
 }
 
 void PoseGraph3D::ScheduleNodesToTrim(const std::set<common::Time>& nodes_to_trim) {
-  std::set<NodeId> node_ids_to_trim;
   absl::MutexLock locker(&mutex_);
   for (const auto& node : data_.trajectory_nodes) {
     if (nodes_to_trim.count(node.data.constant_data->time)) {
