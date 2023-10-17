@@ -1097,7 +1097,6 @@ void PoseGraph3D::TrimScheduledNodes() {
   absl::MutexLock locker(&mutex_);
   for (const NodeId& node_to_trim : nodes_scheduled_to_trim_) {
     if (!data_.trajectory_nodes.Contains(node_to_trim)) {
-      std::cout << "\n\n\n\nNode already trimmed\n\n\n\n";
       continue;
     }
 
