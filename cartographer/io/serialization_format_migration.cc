@@ -202,6 +202,7 @@ void MigrateStreamVersion(
     pose_graph.AddNodeFromProto(node_poses.at(node_id_node.id), node_id_node.data);
   }
   pose_graph.AddSerializedConstraints(FromProto(pose_graph_proto.constraint()));
+  pose_graph.WaitForAllComputations();
   CHECK(input->eof());
 
   WritePbStream(pose_graph, trajectory_builder_options, output,

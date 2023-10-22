@@ -201,7 +201,6 @@ public:
 
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
 
-protected:
   void WaitForAllComputations()
       ABSL_LOCKS_EXCLUDED(mutex_)
       ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
