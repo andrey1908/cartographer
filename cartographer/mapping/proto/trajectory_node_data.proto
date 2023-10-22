@@ -29,5 +29,6 @@ message TrajectoryNodeData {
   sensor.proto.CompressedPointCloud low_resolution_point_cloud = 5;
   repeated float rotational_scan_matcher_histogram = 6;
   transform.proto.Rigid3d local_pose = 7;
+  double accum_rotation = 9;
   double travelled_distance = 8;
 }

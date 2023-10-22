@@ -17,6 +17,7 @@
 #include "cartographer/mapping/internal/3d/local_trajectory_builder_3d.h"
 
 #include <memory>
+#include <cmath>
 
 #include "absl/memory/memory.h"
 #include "cartographer/common/time.h"
@@ -58,6 +59,7 @@ LocalTrajectoryBuilder3D::LocalTrajectoryBuilder3D(
       ceres_scan_matcher_(absl::make_unique<scan_matching::CeresScanMatcher3D>(
           options_.ceres_scan_matcher_options())),
       range_data_collator_(expected_range_sensor_ids),
+      accum_rotation_(0.),
       travelled_distance_(0.) {}
 
 LocalTrajectoryBuilder3D::~LocalTrajectoryBuilder3D() {}
@@ -330,7 +332,13 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
   }
   extrapolator_->AddPose(time, *pose_estimate);
 
-  travelled_distance_ += (pose_estimate->translation() - last_pose_estimate_.translation()).norm();
+  transform::Rigid3d diff = last_pose_estimate_.inverse() * (*pose_estimate);
+  double angle = 2 * std::acos(diff.rotation().w());
+  if (angle > M_PI) {
+    angle -= 2 * M_PI;
+  }
+  accum_rotation_ += std::abs(angle);
+  travelled_distance_ += diff.translation().norm();
   last_pose_estimate_ = *pose_estimate;
 
   const auto scan_matcher_stop = std::chrono::steady_clock::now();
@@ -448,6 +456,7 @@ LocalTrajectoryBuilder3D::InsertIntoSubmap(
                               low_resolution_point_cloud_in_tracking,
                               rotational_scan_matcher_histogram_in_gravity,
                               pose_estimate,
+                              accum_rotation_,
                               travelled_distance_}),
                       std::move(insertion_submaps)});
 }

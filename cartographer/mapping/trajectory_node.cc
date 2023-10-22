@@ -45,6 +45,7 @@ proto::TrajectoryNodeData ToProto(const TrajectoryNode::Data& constant_data) {
         constant_data.rotational_scan_matcher_histogram(i));
   }
   *proto.mutable_local_pose() = transform::ToProto(constant_data.local_pose);
+  proto.set_accum_rotation(constant_data.accum_rotation);
   proto.set_travelled_distance(constant_data.travelled_distance);
   return proto;
 }
@@ -67,6 +68,7 @@ TrajectoryNode::Data FromProto(const proto::TrajectoryNodeData& proto) {
           .Decompress(),
       rotational_scan_matcher_histogram,
       transform::ToRigid3(proto.local_pose()),
+      proto.accum_rotation(),
       proto.travelled_distance()};
 }
 

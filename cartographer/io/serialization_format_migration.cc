@@ -17,6 +17,8 @@
 #include "cartographer/io/serialization_format_migration.h"
 
 #include <vector>
+#include <cmath>
+#include <limits>
 
 #include "cartographer/common/config.h"
 #include "cartographer/common/configuration_file_resolver.h"
@@ -67,8 +69,21 @@ void MigrateStreamVersion(
 
   // Create a copy of the pose_graph_proto
   proto::PoseGraph pose_graph_proto = deserializer.pose_graph();
-  const auto& all_builder_options_proto =
+  auto all_builder_options_proto =
       deserializer.all_trajectory_builder_options();
+
+  if (deserializer.header().format_version() <= kFormatVersionWithoutAccumRotation) {
+    for (auto& options_with_sensor_ids : *all_builder_options_proto.mutable_options_with_sensor_ids()) {
+      if (options_with_sensor_ids.trajectory_builder_options().has_loop_trimmer()) {
+        auto& loop_trimmer = *options_with_sensor_ids.mutable_trajectory_builder_options()->mutable_loop_trimmer();
+        if (loop_trimmer.trim_false_detected_loops()) {
+          loop_trimmer.set_rotation_error_rate(std::numeric_limits<double>::infinity());
+          loop_trimmer.set_translation_to_rotation_error(std::numeric_limits<double>::infinity());
+          loop_trimmer.set_rotation_to_translation_error_rate(0.0);
+        }
+      }
+    }
+  }
 
   std::vector<proto::TrajectoryBuilderOptionsWithSensorIds>
       trajectory_builder_options;
@@ -175,6 +190,10 @@ void MigrateStreamVersion(
     node_id_to_node =
         AddTravelledDistanceToNodes(node_id_to_node);
   }
+  if (deserializer.header().format_version() <= kFormatVersionWithoutAccumRotation) {
+    node_id_to_node =
+        AddAccumRotationToNodes(node_id_to_node);
+  }
 
   for (const auto& submap_id_submap : submap_id_to_submap) {
     pose_graph.AddSubmapFromProto(submap_poses.at(submap_id_submap.id), submap_id_submap.data);
@@ -261,6 +280,31 @@ MapById<NodeId, proto::Node> AddTravelledDistanceToNodes(
       travelled_distance += (pose.translation() - prev_pose.translation()).norm();
       proto::Node node = node_id_node.data;
       node.mutable_node_data()->set_travelled_distance(travelled_distance);
+      migrated_nodes.Insert(node_id_node.id, node);
+      prev_pose = pose;
+    }
+  }
+  return migrated_nodes;
+}
+
+MapById<NodeId, proto::Node> AddAccumRotationToNodes(
+    const MapById<NodeId, proto::Node>& node_id_to_node) {
+  MapById<NodeId, proto::Node> migrated_nodes;
+  for (int trajectory_id : node_id_to_node.trajectory_ids()) {
+    double accum_rotation = 0.;
+    transform::Rigid3d prev_pose =
+        transform::ToRigid3(
+            node_id_to_node.BeginOfTrajectory(trajectory_id)->data.node_data().local_pose());
+    for (const auto& node_id_node : node_id_to_node.trajectory(trajectory_id)) {
+      transform::Rigid3d pose = transform::ToRigid3(node_id_node.data.node_data().local_pose());
+      Eigen::Quaterniond rotation = prev_pose.rotation().conjugate() * pose.rotation();
+      double angle = 2 * std::acos(rotation.w());
+      if (angle > M_PI) {
+        angle -= 2 * M_PI;
+      }
+      accum_rotation += std::abs(angle);
+      proto::Node node = node_id_node.data;
+      node.mutable_node_data()->set_accum_rotation(accum_rotation);
       migrated_nodes.Insert(node_id_node.id, node);
       prev_pose = pose;
     }

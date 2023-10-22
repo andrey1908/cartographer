@@ -638,8 +638,8 @@ NodeId PoseGraph3D::AppendNode(
     constraints_.SetFirstNodeIdForSubmap(node_id, submap_id);
     kActiveSubmapsMetric->Increment();
   }
-  constraints_.SetTravelledDistance(node_id,
-      data_.trajectory_nodes.at(node_id).constant_data->travelled_distance);
+  constraints_.SetAccumRotationAndTravelledDistance(node_id,
+      constant_data->accum_rotation, constant_data->travelled_distance);
   if (!maps_.ContainsTrajectory(trajectory_id)) {
     maps_.AddTrajectory("default", trajectory_id);
   }
@@ -937,8 +937,8 @@ PoseGraph3D::TrimFalseDetectedLoops(const std::vector<Constraint>& new_loops) {
     const NodeId& new_loop_node_1 = new_loop.node_id;
     const NodeId& new_loop_node_2 =
         *data_.submap_data.at(new_loop.submap_id).node_ids.begin();
-    double travelled_distance =
-        constraints_.GetTravelledDistanceWithLoops(
+    auto [accum_rotation, travelled_distance] =
+        constraints_.GetAccumRotationAndTravelledDistanceWithLoops(
             new_loop_node_1, new_loop_node_2, new_loop.score);
     const transform::Rigid3d& global_submap_pose =
         data_.global_submap_poses_3d.at(new_loop.submap_id).global_pose;
@@ -946,10 +946,22 @@ PoseGraph3D::TrimFalseDetectedLoops(const std::vector<Constraint>& new_loops) {
         data_.trajectory_nodes.at(new_loop.node_id).global_pose;
     const transform::Rigid3d relative_node_pose =
         global_submap_pose.inverse() * global_node_pose;
-    const double translation_error =
-        (new_loop.pose.zbar_ij.translation() - relative_node_pose.translation()).norm();
-    if (translation_error / travelled_distance <
-        loop_trimmer_options.max_translation_error_travelled_distance_ratio()) {
+    const transform::Rigid3d error = new_loop.pose.zbar_ij.inverse() * relative_node_pose;
+    double rotation_error = 2 * std::acos(error.rotation().w());
+    if (rotation_error > M_PI) {
+      rotation_error -= 2 * M_PI;
+    }
+    rotation_error = std::abs(rotation_error);
+    const double translation_error = error.translation().norm();
+
+    const double max_rotation_error =
+        loop_trimmer_options.rotation_error_rate() * accum_rotation +
+        loop_trimmer_options.translation_to_rotation_error() * travelled_distance;
+    const double max_translation_error =
+        loop_trimmer_options.translation_error_rate() * travelled_distance +
+        loop_trimmer_options.rotation_to_translation_error_rate() * accum_rotation * travelled_distance;
+
+    if (rotation_error < max_rotation_error && translation_error < max_translation_error) {
       true_detected_loops.push_back(new_loop);
     }
   }
@@ -1561,8 +1573,8 @@ void PoseGraph3D::AddNodeFromProto(
     data_.trajectory_nodes.Insert(node_id,
         TrajectoryNode{constant_data, global_pose});
     data_.trajectory_nodes.at(node_id).submap_ids.reserve(2);
-    constraints_.SetTravelledDistance(node_id,
-        data_.trajectory_nodes.at(node_id).constant_data->travelled_distance);
+    constraints_.SetAccumRotationAndTravelledDistance(node_id,
+        constant_data->accum_rotation, constant_data->travelled_distance);
   }
 
   AddWorkItem([this, node_id, global_pose]()

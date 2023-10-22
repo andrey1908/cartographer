@@ -5,10 +5,17 @@
 namespace cartographer {
 namespace mapping {
 
-void PoseGraphConstraints::SetTravelledDistance(
-    const NodeId& node_id, double travelled_distance) {
-  CHECK(travelled_distance_.count(node_id) == 0);
-  travelled_distance_.emplace(node_id, travelled_distance);
+static std::pair<double, double> operator+(
+    const std::pair<double, double>& a, const std::pair<double, double>& b) {
+  std::pair<double, double> sum(a.first + b.first, a.second + b.second);
+  return sum;
+}
+
+void PoseGraphConstraints::SetAccumRotationAndTravelledDistance(
+    const NodeId& node_id, double accum_rotation, double travelled_distance) {
+  CHECK(accum_rotation_and_travelled_distance_.count(node_id) == 0);
+  accum_rotation_and_travelled_distance_.emplace(
+      node_id, std::make_pair(accum_rotation, travelled_distance));
 }
 
 void PoseGraphConstraints::SetFirstNodeIdForSubmap(
@@ -27,29 +34,35 @@ void PoseGraphConstraints::FixNode(const NodeId& node_id) {
   }
 }
 
-double PoseGraphConstraints::GetTravelledDistanceWithLoops(
+std::pair<double, double> PoseGraphConstraints::GetAccumRotationAndTravelledDistanceWithLoops(
     const NodeId& node_1, const NodeId& node_2, float min_score) const {
   if (node_1.trajectory_id == node_2.trajectory_id) {
-    return GetTravelledDistanceWithLoopsSameTrajectory(node_1, node_2, min_score);
+    return GetAccumRotationAndTravelledDistanceWithLoopsSameTrajectory(
+        node_1, node_2, min_score);
   } else {
-    return GetTravelledDistanceWithLoopsDifferentTrajectories(node_1, node_2, min_score);
+    return GetAccumRotationAndTravelledDistanceWithLoopsDifferentTrajectories(
+        node_1, node_2, min_score);
   }
 }
 
-double PoseGraphConstraints::GetTravelledDistanceWithLoopsSameTrajectory(
+std::pair<double, double> PoseGraphConstraints::GetAccumRotationAndTravelledDistanceWithLoopsSameTrajectory(
     NodeId node_1, NodeId node_2, float min_score) const {
   CHECK(node_1.trajectory_id == node_2.trajectory_id);
   if (node_1 == node_2) {
-    return 0.0;
+    return std::make_pair(0.0, 0.0);
   }
   if (node_2 < node_1) {
     std::swap(node_1, node_2);
   }
-  CHECK(travelled_distance_.count(node_1));
-  CHECK(travelled_distance_.count(node_2));
-  double travelled_distance_at_node_1 = travelled_distance_.at(node_1);
-  double travelled_distance_at_node_2 = travelled_distance_.at(node_2);
+  CHECK(accum_rotation_and_travelled_distance_.count(node_1));
+  CHECK(accum_rotation_and_travelled_distance_.count(node_2));
+  auto [accum_rotation_at_node_1, travelled_distance_at_node_1] =
+      accum_rotation_and_travelled_distance_.at(node_1);
+  auto [accum_rotation_at_node_2, travelled_distance_at_node_2] =
+      accum_rotation_and_travelled_distance_.at(node_2);
+  double accum_rotation = accum_rotation_at_node_2 - accum_rotation_at_node_1;
   double travelled_distance = travelled_distance_at_node_2 - travelled_distance_at_node_1;
+  CHECK(accum_rotation >= 0.0);
   CHECK(travelled_distance >= 0.0);
   for (const Constraint& loop : constraints_) {
     if (loop.tag == Constraint::INTRA_SUBMAP) {
@@ -74,23 +87,32 @@ double PoseGraphConstraints::GetTravelledDistanceWithLoopsSameTrajectory(
         loop_node_1.node_index >= node_2.node_index) {
       continue;
     }
-    CHECK(travelled_distance_.count(loop_node_1));
-    CHECK(travelled_distance_.count(loop_node_2));
+    CHECK(accum_rotation_and_travelled_distance_.count(loop_node_1));
+    CHECK(accum_rotation_and_travelled_distance_.count(loop_node_2));
+    auto [accum_rotation_at_loop_node_1, travelled_distance_at_loop_node_1] =
+        accum_rotation_and_travelled_distance_.at(loop_node_1);
+    auto [accum_rotation_at_loop_node_2, travelled_distance_at_loop_node_2] =
+        accum_rotation_and_travelled_distance_.at(loop_node_2);
+    double accum_rotation_with_loop =
+        std::abs(accum_rotation_at_loop_node_1 - accum_rotation_at_node_1) +
+        std::abs(accum_rotation_at_loop_node_2 - accum_rotation_at_node_2);
     double travelled_distance_with_loop =
-        std::abs(travelled_distance_.at(loop_node_1) - travelled_distance_at_node_1) +
-        std::abs(travelled_distance_.at(loop_node_2) - travelled_distance_at_node_2);
+        std::abs(travelled_distance_at_loop_node_1 - travelled_distance_at_node_1) +
+        std::abs(travelled_distance_at_loop_node_2 - travelled_distance_at_node_2);
+    accum_rotation = std::min(accum_rotation, accum_rotation_with_loop);
     travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
   }
-  return travelled_distance;
+  return std::make_pair(accum_rotation, travelled_distance);
 }
 
-double PoseGraphConstraints::GetTravelledDistanceWithLoopsDifferentTrajectories(
+std::pair<double, double> PoseGraphConstraints::GetAccumRotationAndTravelledDistanceWithLoopsDifferentTrajectories(
     NodeId node_1, NodeId node_2, float min_score) const {
   CHECK(node_1.trajectory_id != node_2.trajectory_id);
   if (node_2 < node_1) {
     std::swap(node_1, node_2);
   }
 
+  double accum_rotation = std::numeric_limits<double>::max();
   double travelled_distance = std::numeric_limits<double>::max();
   for (const Constraint& loop : constraints_) {
     if (loop.tag == Constraint::INTRA_SUBMAP) {
@@ -111,9 +133,10 @@ double PoseGraphConstraints::GetTravelledDistanceWithLoopsDifferentTrajectories(
     if (loop_node_2 < loop_node_1) {
       std::swap(loop_node_1, loop_node_2);
     }
-    double travelled_distance_with_loop =
-        GetTravelledDistanceWithLoopsSameTrajectory(node_1, loop_node_1, min_score) +
-        GetTravelledDistanceWithLoopsSameTrajectory(node_2, loop_node_2, min_score);
+    auto [accum_rotation_with_loop, travelled_distance_with_loop] =
+        GetAccumRotationAndTravelledDistanceWithLoopsSameTrajectory(node_1, loop_node_1, min_score) +
+        GetAccumRotationAndTravelledDistanceWithLoopsSameTrajectory(node_2, loop_node_2, min_score);
+    accum_rotation = std::min(accum_rotation, accum_rotation_with_loop);
     travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
   }
 
@@ -133,25 +156,39 @@ double PoseGraphConstraints::GetTravelledDistanceWithLoopsDifferentTrajectories(
     if (loop_node_2 < loop_node_1) {
       std::swap(loop_node_1, loop_node_2);
     }
-    double travelled_distance_with_loop =
-        GetTravelledDistanceWithLoopsSameTrajectory(node_1, loop_node_1, min_score) +
-        GetTravelledDistanceWithLoopsSameTrajectory(node_2, loop_node_2, min_score);
+    auto [accum_rotation_with_loop, travelled_distance_with_loop] =
+        GetAccumRotationAndTravelledDistanceWithLoopsSameTrajectory(node_1, loop_node_1, min_score) +
+        GetAccumRotationAndTravelledDistanceWithLoopsSameTrajectory(node_2, loop_node_2, min_score);
+    accum_rotation = std::min(accum_rotation, accum_rotation_with_loop);
     travelled_distance = std::min(travelled_distance, travelled_distance_with_loop);
   }
+
+  auto [accum_rotation_at_node_1, travelled_distance_at_node_1] =
+      accum_rotation_and_travelled_distance_.at(node_1);
+  auto [accum_rotation_at_node_2, travelled_distance_at_node_2] =
+      accum_rotation_and_travelled_distance_.at(node_2);
 
   auto fixed_node_1_it = trajectory_fixed_node_.find(node_1.trajectory_id);
   if (fixed_node_1_it != trajectory_fixed_node_.end()) {
     const NodeId& fixed_node_1 = fixed_node_1_it->second;
+    auto [accum_rotation_at_fixed_node_1, travelled_distance_at_fixed_node_1] =
+        accum_rotation_and_travelled_distance_.at(fixed_node_1);
+    accum_rotation = std::min(accum_rotation,
+        std::abs(accum_rotation_at_fixed_node_1 - accum_rotation_at_node_1));
     travelled_distance = std::min(travelled_distance,
-        std::abs(travelled_distance_.at(fixed_node_1) - travelled_distance_.at(node_1)));
+        std::abs(travelled_distance_at_fixed_node_1 - travelled_distance_at_node_1));
   }
   auto fixed_node_2_it = trajectory_fixed_node_.find(node_2.trajectory_id);
   if (fixed_node_2_it != trajectory_fixed_node_.end()) {\
     const NodeId& fixed_node_2 = fixed_node_2_it->second;
+    auto [accum_rotation_at_fixed_node_2, travelled_distance_at_fixed_node_2] =
+        accum_rotation_and_travelled_distance_.at(fixed_node_2);
+    accum_rotation = std::min(accum_rotation,
+        std::abs(accum_rotation_at_fixed_node_2 - accum_rotation_at_node_2));
     travelled_distance = std::min(travelled_distance,
-        std::abs(travelled_distance_.at(fixed_node_2) - travelled_distance_.at(node_2)));
+        std::abs(travelled_distance_at_fixed_node_2 - travelled_distance_at_node_2));
   }
-  return travelled_distance;
+  return std::make_pair(accum_rotation, travelled_distance);
 }
 
 bool PoseGraphConstraints::IsLoopLast(const Constraint& loop) {

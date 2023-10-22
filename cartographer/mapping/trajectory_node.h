@@ -62,6 +62,7 @@ struct TrajectoryNode {
     // The node pose in the local SLAM frame.
     transform::Rigid3d local_pose;
 
+    double accum_rotation;
     double travelled_distance;
   };
 

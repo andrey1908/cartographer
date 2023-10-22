@@ -47,8 +47,15 @@ void PopulateLoopTrimmerOptions(
       trajectory_builder_options->mutable_loop_trimmer();
   options->set_trim_false_detected_loops(
       options_dictionary->GetBool("trim_false_detected_loops"));
-  options->set_max_translation_error_travelled_distance_ratio(
-      options_dictionary->GetDouble("max_translation_error_travelled_distance_ratio"));
+  options->set_rotation_error_rate(
+      options_dictionary->GetDouble("rotation_error_rate"));
+  options->set_translation_to_rotation_error(
+      options_dictionary->GetDouble("translation_to_rotation_error"));
+  options->set_translation_error_rate(
+      options_dictionary->GetDouble("translation_error_rate"));
+  options->set_rotation_to_translation_error_rate(
+      options_dictionary->GetDouble("rotation_to_translation_error_rate"));
+
   options->set_trim_loops_in_window(
       options_dictionary->GetBool("trim_loops_in_window"));
   options->set_window_size_per_submap(

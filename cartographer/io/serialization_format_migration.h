@@ -37,6 +37,9 @@ mapping::MapById<mapping::SubmapId, mapping::proto::Submap> AddHistogramsToSubma
 mapping::MapById<mapping::NodeId, mapping::proto::Node> AddTravelledDistanceToNodes(
     const mapping::MapById<mapping::NodeId, mapping::proto::Node>& node_id_to_node);
 
+mapping::MapById<mapping::NodeId, mapping::proto::Node> AddAccumRotationToNodes(
+    const mapping::MapById<mapping::NodeId, mapping::proto::Node>& node_id_to_node);
+
 }  // namespace io
 }  // namespace cartographer
 

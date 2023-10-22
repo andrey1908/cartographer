@@ -58,8 +58,8 @@ public:
     loops_from_trimmed_submaps_.emplace_back(std::forward<T>(trimmed_loop));
   }
 
-  void SetTravelledDistance(
-      const NodeId& node_id, double travelled_distance);
+  void SetAccumRotationAndTravelledDistance(
+      const NodeId& node_id, double accum_rotation, double travelled_distance);
   void SetFirstNodeIdForSubmap(
       const NodeId& first_node_id, const SubmapId& submap_id);
 
@@ -69,7 +69,7 @@ public:
     return constraints_;
   }
 
-  double GetTravelledDistanceWithLoops(
+  std::pair<double, double> GetAccumRotationAndTravelledDistanceWithLoops(
       const NodeId& node_1, const NodeId& node_2, float min_score) const;
   bool IsLoopLast(const Constraint& loop);
 
@@ -122,15 +122,15 @@ private:
     }
   }
 
-  double GetTravelledDistanceWithLoopsSameTrajectory(
+  std::pair<double, double> GetAccumRotationAndTravelledDistanceWithLoopsSameTrajectory(
       NodeId node_1, NodeId node_2, float min_score) const;
-  double GetTravelledDistanceWithLoopsDifferentTrajectories(
+  std::pair<double, double> GetAccumRotationAndTravelledDistanceWithLoopsDifferentTrajectories(
       NodeId node_1, NodeId node_2, float min_score) const;
 
 private:
   std::vector<Constraint> constraints_;
   std::vector<TrimmedLoop> loops_from_trimmed_submaps_;
-  std::map<NodeId, double> travelled_distance_;
+  std::map<NodeId, std::pair<double, double>> accum_rotation_and_travelled_distance_;
   std::map<int, NodeId> trajectory_fixed_node_;
   std::map<SubmapId, NodeId> first_node_id_for_submap_;
   std::map<int, int> last_loop_submap_index_for_trajectory_;
