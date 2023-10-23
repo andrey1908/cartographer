@@ -37,6 +37,8 @@
 #include "cartographer/transform/transform.h"
 #include "glog/logging.h"
 
+#include "kas_metrics/collection.hpp"
+
 namespace cartographer {
 namespace mapping {
 
@@ -1223,6 +1225,39 @@ void PoseGraph3D::HandleWorkQueue(
   }
 }
 
+static void work_item_processing_latency_print_summary(
+    const std::string& name, const std::vector<double>& latencies) {
+  if (latencies.size()) {
+    double accum_latency = 0.0;
+    double max_latency = 0.0;
+    for (double latency : latencies) {
+      accum_latency += latency;
+      max_latency = std::max(max_latency, latency);
+    }
+    double average_latency = accum_latency / latencies.size();
+
+    std::string log_string;
+    log_string += name + ":\n";
+    log_string += "    Average latency: " + std::to_string(average_latency) + "\n";
+    log_string += "    Max latency: " + std::to_string(max_latency) + "\n";
+
+    std::cout << log_string;
+  }
+}
+
+static void max_queue_size_print_summary(
+    const std::string& name, const std::vector<long unsigned int>& max_queue_sizes) {
+  std::string log_string;
+  log_string += name + ":\n";
+  log_string += "    Queue size: ";
+  for (long unsigned int max_queue_size : max_queue_sizes) {
+    log_string += std::to_string(max_queue_size) + " ";
+  }
+  log_string += "\n";
+
+  std::cout << log_string;
+}
+
 void PoseGraph3D::DrainWorkQueue() {
   bool process_work_queue = true;
   size_t work_queue_size;
@@ -1231,24 +1266,14 @@ void PoseGraph3D::DrainWorkQueue() {
   static long unsigned int max_queue_size = 0;
   {
     absl::MutexLock locker(&work_queue_mutex_);
-    max_queue_size = max_queue_size < work_queue_->size() ? work_queue_->size() : max_queue_size;
+    max_queue_size = std::max(max_queue_size, work_queue_->size());
   }
   auto now_time = std::chrono::steady_clock::now();
   if (common::ToSeconds(now_time - last_log_time) > 3) {
-    static std::unique_ptr<std::vector<long unsigned int>, std::function<void(std::vector<long unsigned int>*)>> max_queue_size_list_ptr(
-      new std::vector<long unsigned int>, 
-      [](std::vector<long unsigned int>* list_ptr){
-        std::string log_string;
-        log_string += "Max queue size list:\n";
-        log_string += "    ";
-        for (auto max_queue_size : *list_ptr) {
-          log_string += std::to_string(max_queue_size) + " ";
-        }
-        log_string += "\n";
-        std::cout << log_string;
-        delete list_ptr;
-      });
-    max_queue_size_list_ptr->push_back(max_queue_size);
+    static kas_metrics::Collection<long unsigned int> max_queue_size_col(
+        "max_queue_size", max_queue_size_print_summary, nullptr);
+    max_queue_size_col.add(max_queue_size);
+
     last_log_time = now_time;
     if (options_.log_work_queue_size()) {
       LOG(INFO) << "Work items in queue: " << max_queue_size;
@@ -1256,7 +1281,8 @@ void PoseGraph3D::DrainWorkQueue() {
     max_queue_size = 0;
   }
 
-  static time_measurer::TimeMeasurer work_item_processing_latency("work_item_processing_latency", true);
+  static kas_metrics::Collection<double> work_item_processing_latency_col(
+      "work_item_processing_latency", work_item_processing_latency_print_summary, nullptr);
   while (process_work_queue) {
     std::function<WorkItem::Result()> work_item;
     {
@@ -1267,7 +1293,7 @@ void PoseGraph3D::DrainWorkQueue() {
       }
       auto add_time = work_queue_->front().time;
       auto now_time = std::chrono::steady_clock::now();
-      work_item_processing_latency.addMeasurement(common::ToSeconds(now_time - add_time));
+      work_item_processing_latency_col.add(common::ToSeconds(now_time - add_time));
       work_item = work_queue_->front().task;
       work_queue_->pop_front();
       work_queue_size = work_queue_->size();

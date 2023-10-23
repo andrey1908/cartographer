@@ -29,7 +29,7 @@ include("${PROJECT_SOURCE_DIR}/cmake/functions.cmake")
 google_initialize_cartographer_project()
 google_enable_testing()
 
-find_package(time_measurer REQUIRED)
+find_package(kas_metrics REQUIRED)
 
 find_package(absl REQUIRED)
 set(BOOST_COMPONENTS iostreams)
@@ -227,8 +227,8 @@ if(${BUILD_GRPC})
 endif()
 
 target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
-  "${time_measurer_INCLUDE_DIRS}")
-target_link_libraries(${PROJECT_NAME} PUBLIC ${time_measurer_LIBRARIES})
+  "${kas_metrics_INCLUDE_DIRS}")
+target_link_libraries(${PROJECT_NAME} PUBLIC ${kas_metrics_LIBRARIES})
 
 target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
   "${EIGEN3_INCLUDE_DIR}")

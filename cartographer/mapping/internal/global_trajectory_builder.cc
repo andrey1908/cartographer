@@ -26,7 +26,7 @@
 #include "cartographer/metrics/family_factory.h"
 #include "glog/logging.h"
 
-#include "time_measurer/time_measurer.h"
+#include "kas_metrics/time_measurer.h"
 
 namespace cartographer {
 namespace mapping {
