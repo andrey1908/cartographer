@@ -1445,6 +1445,21 @@ void PoseGraph3D::WaitForAllComputations() {
   std::cout << "\r\x1b[KOptimizing: Done.     " << std::endl;
 }
 
+void PoseGraph3D::WaitForQueue() {
+  bool work_queue_reset;
+  {
+    absl::MutexLock locker(&work_queue_mutex_);
+    work_queue_reset = (work_queue_ == nullptr);
+  }
+  while (!work_queue_reset) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    {
+      absl::MutexLock locker(&work_queue_mutex_);
+      work_queue_reset = (work_queue_ == nullptr);
+    }
+  }
+}
+
 void PoseGraph3D::DeleteTrajectory(int trajectory_id) {
   {
     absl::MutexLock locker(&mutex_);

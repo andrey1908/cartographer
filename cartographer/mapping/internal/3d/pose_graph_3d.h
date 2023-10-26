@@ -205,6 +205,9 @@ public:
       ABSL_LOCKS_EXCLUDED(mutex_)
       ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
 
+  void WaitForQueue() override
+      ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
+
 private:
   void AddWorkItem(const std::function<WorkItem::Result()>& work_item)
       ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
