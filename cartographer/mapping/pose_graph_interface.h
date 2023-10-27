@@ -123,6 +123,8 @@ class PoseGraphInterface {
 
   virtual void ScheduleNodesToTrim(const std::set<NodeId>& nodes_to_trim) = 0;
   virtual void ScheduleNodesToTrim(const std::set<common::Time>& nodes_to_trim) = 0;
+  virtual void ScheduleFalseConstraintsTrimming(
+      double max_rotation_error, double max_translation_error) = 0;
 
   // Returns the trajectory data.
   virtual std::map<int, TrajectoryData> GetTrajectoryData() const = 0;

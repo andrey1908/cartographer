@@ -139,6 +139,9 @@ public:
       const proto::LoopTrimmerOptions& loop_trimmer_options) override
           ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
 
+  void ScheduleFalseConstraintsTrimming(
+      double max_rotation_error, double max_translation_error) override
+          ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
   void RunFinalOptimization() override
       ABSL_LOCKS_EXCLUDED(mutex_)
       ABSL_LOCKS_EXCLUDED(work_queue_mutex_);

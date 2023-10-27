@@ -1362,6 +1362,43 @@ void PoseGraph3D::RunOptimization() {
   }
 }
 
+void PoseGraph3D::ScheduleFalseConstraintsTrimming(
+    double max_rotation_error, double max_translation_error) {
+  AddWorkItem([this, max_rotation_error, max_translation_error]()
+        ABSL_LOCKS_EXCLUDED(mutex_)
+        ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
+    absl::MutexLock queue_locker(&executing_work_item_mutex_);
+    absl::MutexLock locker(&mutex_);
+    std::vector<Constraint> constraints_keep;
+    for (const Constraint& constraint : constraints_) {
+      if (constraint.tag == Constraint::INTRA_SUBMAP) {
+        constraints_keep.push_back(constraint);
+        continue;
+      }
+
+      const transform::Rigid3d& submap_pose =
+          data_.global_submap_poses_3d.at(constraint.submap_id).global_pose;
+      const transform::Rigid3d& node_pose =
+          data_.trajectory_nodes.at(constraint.node_id).global_pose;
+      transform::Rigid3d relative_pose = submap_pose.inverse() * node_pose;
+      transform::Rigid3d error = relative_pose.inverse() * constraint.pose.zbar_ij;
+      double rotation_error = 2 * std::acos(error.rotation().w());
+      if (rotation_error > M_PI) {
+        rotation_error -= 2 * M_PI;
+      }
+      rotation_error = std::abs(rotation_error);
+      double translation_error = error.translation().norm();
+
+      if (rotation_error < max_rotation_error && translation_error < max_translation_error) {
+        constraints_keep.push_back(constraint);
+      }
+    }
+
+    constraints_.SetConstraints(std::move(constraints_keep));
+    return WorkItem::Result::kDoNotRunOptimization;
+  });
+}
+
 void PoseGraph3D::RunFinalOptimization() {
   AddWorkItem([this]()
         ABSL_LOCKS_EXCLUDED(mutex_)
@@ -1382,7 +1419,7 @@ void PoseGraph3D::RunFinalOptimization() {
             .ceres_solver_options().max_num_iterations());
     return WorkItem::Result::kDoNotRunOptimization;
   });
-  WaitForAllComputations();
+  WaitForQueue();
 }
 
 void PoseGraph3D::WaitForAllComputations() {
