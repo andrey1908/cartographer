@@ -60,7 +60,9 @@ LocalTrajectoryBuilder3D::LocalTrajectoryBuilder3D(
           options_.ceres_scan_matcher_options())),
       range_data_collator_(expected_range_sensor_ids),
       accum_rotation_(0.),
-      travelled_distance_(0.) {}
+      travelled_distance_(0.) {
+  CHECK_GE(options_.artd_noise_smoothing_factor(), 1);
+}
 
 LocalTrajectoryBuilder3D::~LocalTrajectoryBuilder3D() {}
 
@@ -69,7 +71,6 @@ std::unique_ptr<transform::Rigid3d> LocalTrajectoryBuilder3D::ScanMatch(
     const sensor::PointCloud& low_resolution_point_cloud_in_tracking,
     const sensor::PointCloud& high_resolution_point_cloud_in_tracking) {
   if (active_submaps_.submaps().empty()) {
-    last_pose_estimate_ = pose_prediction;
     return absl::make_unique<transform::Rigid3d>(pose_prediction);
   }
   std::shared_ptr<const mapping::Submap3D> matching_submap =
@@ -332,14 +333,21 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
   }
   extrapolator_->AddPose(time, *pose_estimate);
 
-  transform::Rigid3d diff = last_pose_estimate_.inverse() * (*pose_estimate);
-  double angle = 2 * std::acos(diff.rotation().w());
-  if (angle > M_PI) {
-    angle -= 2 * M_PI;
+  last_poses_estimates_.push_back(*pose_estimate);
+  if (last_poses_estimates_.size() > options_.artd_noise_smoothing_factor() + 1) {
+    last_poses_estimates_.pop_front();
   }
-  accum_rotation_ += std::abs(angle);
-  travelled_distance_ += diff.translation().norm();
-  last_pose_estimate_ = *pose_estimate;
+  if (last_poses_estimates_.size() > 1) {
+    transform::Rigid3d diff =
+        last_poses_estimates_.front().inverse() * last_poses_estimates_.back();
+    double angle = 2 * std::acos(diff.rotation().w());
+    if (angle > M_PI) {
+      angle -= 2 * M_PI;
+    }
+    int div = last_poses_estimates_.size() - 1;
+    accum_rotation_ += std::abs(angle) / div;
+    travelled_distance_ += diff.translation().norm() / div;
+  }
 
   const auto scan_matcher_stop = std::chrono::steady_clock::now();
   const auto scan_matcher_duration = scan_matcher_stop - scan_matcher_start;

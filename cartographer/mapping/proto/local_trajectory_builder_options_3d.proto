@@ -52,6 +52,7 @@ message LocalTrajectoryBuilderOptions3D {
       real_time_correlative_scan_matcher_options = 14;
   mapping.scan_matching.proto.CeresScanMatcherOptions3D
       ceres_scan_matcher_options = 6;
+  int32 artd_noise_smoothing_factor = 10;
   mapping.proto.MotionFilterOptions motion_filter_options = 7;
 
   // Time constant in seconds for the orientation moving average based on

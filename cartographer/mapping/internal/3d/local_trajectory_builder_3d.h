@@ -122,7 +122,7 @@ class LocalTrajectoryBuilder3D {
 
   absl::optional<common::Time> last_sensor_time_;
 
-  transform::Rigid3d last_pose_estimate_;
+  std::list<transform::Rigid3d> last_poses_estimates_;
   double accum_rotation_;
   double travelled_distance_;
 };

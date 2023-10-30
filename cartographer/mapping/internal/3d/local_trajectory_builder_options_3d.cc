@@ -56,6 +56,8 @@ proto::LocalTrajectoryBuilderOptions3D CreateLocalTrajectoryBuilderOptions3D(
   *options.mutable_ceres_scan_matcher_options() =
       mapping::scan_matching::CreateCeresScanMatcherOptions3D(
           parameter_dictionary->GetDictionary("ceres_scan_matcher").get());
+  options.set_artd_noise_smoothing_factor(
+      parameter_dictionary->GetInt("artd_noise_smoothing_factor"));
   *options.mutable_motion_filter_options() = CreateMotionFilterOptions(
       parameter_dictionary->GetDictionary("motion_filter").get());
   *options.mutable_pose_extrapolator_options() = CreatePoseExtrapolatorOptions(
@@ -68,6 +70,7 @@ proto::LocalTrajectoryBuilderOptions3D CreateLocalTrajectoryBuilderOptions3D(
       parameter_dictionary->GetDictionary("submaps").get());
   options.set_use_intensities(parameter_dictionary->GetBool("use_intensities"));
   options.set_use_imu_data(parameter_dictionary->GetBool("use_imu_data"));
+  CHECK_GE(options.artd_noise_smoothing_factor(), 1);
   return options;
 }
 

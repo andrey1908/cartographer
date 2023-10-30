@@ -60,6 +60,8 @@ TRAJECTORY_BUILDER_3D = {
     },
   },
 
+  artd_noise_smoothing_factor = 5,
+
   motion_filter = {
     max_time_seconds = 0.5,
     max_distance_meters = 0.1,
