@@ -1271,7 +1271,7 @@ void PoseGraph3D::DrainWorkQueue() {
   auto now_time = std::chrono::steady_clock::now();
   if (common::ToSeconds(now_time - last_log_time) > 3) {
     static kas_metrics::Collection<long unsigned int> max_queue_size_col(
-        "max_queue_size", max_queue_size_print_summary, nullptr);
+        "max_queue_size", max_queue_size_print_summary, nullptr, nullptr);
     max_queue_size_col.add(max_queue_size);
 
     last_log_time = now_time;
@@ -1282,7 +1282,8 @@ void PoseGraph3D::DrainWorkQueue() {
   }
 
   static kas_metrics::Collection<double> work_item_processing_latency_col(
-      "work_item_processing_latency", work_item_processing_latency_print_summary, nullptr);
+      "work_item_processing_latency", work_item_processing_latency_print_summary,
+      nullptr, nullptr);
   while (process_work_queue) {
     std::function<WorkItem::Result()> work_item;
     {
