@@ -348,8 +348,9 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
     if (angle > M_PI) {
       angle -= 2 * M_PI;
     }
+    angle = std::abs(angle);
     int div = last_poses_estimates_.size() - 1;
-    accum_rotation_ += std::abs(angle) / div;
+    accum_rotation_ += angle / div;
     travelled_distance_ += diff.translation().norm() / div;
   }
 
@@ -373,9 +374,7 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
     if (angle > M_PI) {
       angle -= 2 * M_PI;
     }
-    double rotation_step = std::abs(angle);
-    double translation_step = diff.translation().norm();
-    double stamp = common::ToSeconds(time.time_since_epoch());
+    angle = std::abs(angle);
 
     static kas_metrics::Collection<std::tuple<double, double, double>> displacement_col("displacement", nullptr,
       [](std::ostream& out) {
@@ -386,6 +385,9 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
         out << std::fixed << std::setprecision(6) <<
             stamp << ' ' << rotation_step << ' ' << translation_step;
       });
+    double stamp = common::ToSeconds(time.time_since_epoch());
+    double rotation_step = angle;
+    double translation_step = diff.translation().norm();
     displacement_col.add(std::make_tuple(stamp, rotation_step, translation_step));
   }
 

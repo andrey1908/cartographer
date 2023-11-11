@@ -303,7 +303,8 @@ MapById<NodeId, proto::Node> AddAccumRotationToNodes(
       if (angle > M_PI) {
         angle -= 2 * M_PI;
       }
-      accum_rotation += std::abs(angle);
+      angle = std::abs(angle);
+      accum_rotation += angle;
       proto::Node node = node_id_node.data;
       node.mutable_node_data()->set_accum_rotation(accum_rotation);
       migrated_nodes.Insert(node_id_node.id, node);
