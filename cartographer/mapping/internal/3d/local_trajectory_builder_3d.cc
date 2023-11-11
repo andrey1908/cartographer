@@ -18,6 +18,8 @@
 
 #include <memory>
 #include <cmath>
+#include <iostream>
+#include <iomanip>
 
 #include "absl/memory/memory.h"
 #include "cartographer/common/time.h"
@@ -29,6 +31,8 @@
 #include "cartographer/mapping/proto/submaps_options_3d.pb.h"
 #include "cartographer/transform/timestamped_transform.h"
 #include "glog/logging.h"
+
+#include "kas_metrics/collection.hpp"
 
 namespace cartographer {
 namespace mapping {
@@ -347,6 +351,42 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
     int div = last_poses_estimates_.size() - 1;
     accum_rotation_ += std::abs(angle) / div;
     travelled_distance_ += diff.translation().norm() / div;
+  }
+
+  static kas_metrics::Collection<std::tuple<double, double, double>> artd_col("artd", nullptr,
+      [](std::ostream& out) {
+        out << "stamp" << ' ' << "accum_rotation" << ' ' << "travelled_distance";
+      },
+      [](std::ostream& out, const std::tuple<double, double, double>& artd) {
+        const auto& [stamp, accum_rotation, travelled_distance] = artd;
+        out << std::fixed << std::setprecision(6) <<
+            stamp << ' ' << accum_rotation << ' ' << travelled_distance;
+      });
+  double stamp = common::ToSeconds(time.time_since_epoch());
+  artd_col.add(std::make_tuple(stamp, accum_rotation_, travelled_distance_));
+
+  if (last_poses_estimates_.size() > 1) {
+    auto second_it = std::prev(last_poses_estimates_.end());
+    auto first_it = std::prev(second_it);
+    transform::Rigid3d diff = first_it->inverse() * (*second_it);
+    double angle = 2 * std::acos(diff.rotation().w());
+    if (angle > M_PI) {
+      angle -= 2 * M_PI;
+    }
+    double rotation_step = std::abs(angle);
+    double translation_step = diff.translation().norm();
+    double stamp = common::ToSeconds(time.time_since_epoch());
+
+    static kas_metrics::Collection<std::tuple<double, double, double>> displacement_col("displacement", nullptr,
+      [](std::ostream& out) {
+        out << "stamp" << ' ' << "rotation_steps" << ' ' << "translation_steps";
+      },
+      [](std::ostream& out, const std::tuple<double, double, double>& displacement) {
+        const auto& [stamp, rotation_step, translation_step] = displacement;
+        out << std::fixed << std::setprecision(6) <<
+            stamp << ' ' << rotation_step << ' ' << translation_step;
+      });
+    displacement_col.add(std::make_tuple(stamp, rotation_step, translation_step));
   }
 
   const auto scan_matcher_stop = std::chrono::steady_clock::now();

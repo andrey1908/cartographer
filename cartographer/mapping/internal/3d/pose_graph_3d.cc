@@ -27,6 +27,7 @@
 #include <sstream>
 #include <string>
 #include <random>
+#include <utility>
 
 #include "Eigen/Eigenvalues"
 #include "absl/memory/memory.h"
@@ -962,6 +963,19 @@ PoseGraph3D::TrimFalseDetectedLoops(const std::vector<Constraint>& new_loops) {
     const double max_translation_error =
         loop_trimmer_options.translation_error_rate() * travelled_distance +
         loop_trimmer_options.rotation_to_translation_error_rate() * accum_rotation * travelled_distance;
+
+    static kas_metrics::Collection<std::tuple<double, double, double, double, double>> trim_loops_col("trim_loops", nullptr,
+        [](std::ostream& out) {
+          out << "stamp" << ' ' << "max_rotation_error" << ' ' << "rotation_error" << ' ' <<
+              "max_translation_error" << ' ' << "translation_error";
+        },
+        [](std::ostream& out, const std::tuple<double, double, double, double, double>& data) {
+          const auto& [stamp, max_re, re, max_te, te] = data;
+          out << std::fixed << std::setprecision(6) <<
+              stamp << ' ' << max_re << ' ' << re << ' ' << max_te << ' ' << te;
+        });
+    double stamp = common::ToSeconds(GetLatestNodeTime(new_loop.node_id, new_loop.submap_id).time_since_epoch());
+    trim_loops_col.add(std::make_tuple(stamp, max_rotation_error, rotation_error, max_translation_error, translation_error));
 
     if (rotation_error < max_rotation_error && translation_error < max_translation_error) {
       true_detected_loops.push_back(new_loop);
