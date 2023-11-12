@@ -974,7 +974,8 @@ PoseGraph3D::TrimFalseDetectedLoops(const std::vector<Constraint>& new_loops) {
           out << std::fixed << std::setprecision(6) <<
               stamp << ' ' << max_re << ' ' << re << ' ' << max_te << ' ' << te;
         });
-    double stamp = common::ToSeconds(GetLatestNodeTime(new_loop.node_id, new_loop.submap_id).time_since_epoch());
+    double stamp = common::ToSeconds(GetLatestNodeTime(new_loop.node_id, new_loop.submap_id).time_since_epoch()) -
+        common::kUtsEpochOffsetFromUnixEpochInSeconds;
     trim_loops_col.add(std::make_tuple(stamp, max_rotation_error, rotation_error, max_translation_error, translation_error));
 
     if (rotation_error < max_rotation_error && translation_error < max_translation_error) {

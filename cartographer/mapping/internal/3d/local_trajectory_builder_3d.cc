@@ -363,7 +363,8 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
         out << std::fixed << std::setprecision(6) <<
             stamp << ' ' << accum_rotation << ' ' << travelled_distance;
       });
-  double stamp = common::ToSeconds(time.time_since_epoch());
+  double stamp = common::ToSeconds(time.time_since_epoch()) -
+      common::kUtsEpochOffsetFromUnixEpochInSeconds;
   artd_col.add(std::make_tuple(stamp, accum_rotation_, travelled_distance_));
 
   if (last_poses_estimates_.size() > 1) {
@@ -385,7 +386,8 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
         out << std::fixed << std::setprecision(6) <<
             stamp << ' ' << rotation_step << ' ' << translation_step;
       });
-    double stamp = common::ToSeconds(time.time_since_epoch());
+    double stamp = common::ToSeconds(time.time_since_epoch()) -
+        common::kUtsEpochOffsetFromUnixEpochInSeconds;
     double rotation_step = angle;
     double translation_step = diff.translation().norm();
     displacement_col.add(std::make_tuple(stamp, rotation_step, translation_step));
