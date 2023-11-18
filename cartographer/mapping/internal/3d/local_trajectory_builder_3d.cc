@@ -32,7 +32,7 @@
 #include "cartographer/transform/timestamped_transform.h"
 #include "glog/logging.h"
 
-#include "kas_metrics/collection.hpp"
+#include "kas_utils/collection.hpp"
 
 namespace cartographer {
 namespace mapping {
@@ -354,7 +354,7 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
     travelled_distance_ += diff.translation().norm() / div;
   }
 
-  static kas_metrics::Collection<std::tuple<double, double, double>> artd_col("artd", nullptr,
+  static kas_utils::Collection<std::tuple<double, double, double>> artd_col("artd", nullptr,
       [](std::ostream& out) {
         out << "stamp" << ' ' << "accum_rotation" << ' ' << "travelled_distance";
       },
@@ -377,7 +377,7 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
     }
     angle = std::abs(angle);
 
-    static kas_metrics::Collection<std::tuple<double, double, double>> displacement_col("displacement", nullptr,
+    static kas_utils::Collection<std::tuple<double, double, double>> displacement_col("displacement", nullptr,
       [](std::ostream& out) {
         out << "stamp" << ' ' << "rotation_steps" << ' ' << "translation_steps";
       },

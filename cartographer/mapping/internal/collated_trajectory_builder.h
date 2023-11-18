@@ -31,7 +31,7 @@
 #include "cartographer/sensor/collator_interface.h"
 #include "cartographer/sensor/internal/dispatchable.h"
 
-#include "kas_metrics/time_measurer.h"
+#include "kas_utils/time_measurer.h"
 
 namespace cartographer {
 namespace mapping {

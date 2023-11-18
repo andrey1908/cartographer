@@ -38,7 +38,7 @@
 #include "cartographer/transform/transform.h"
 #include "glog/logging.h"
 
-#include "kas_metrics/collection.hpp"
+#include "kas_utils/collection.hpp"
 
 namespace cartographer {
 namespace mapping {
@@ -964,7 +964,7 @@ PoseGraph3D::TrimFalseDetectedLoops(const std::vector<Constraint>& new_loops) {
         loop_trimmer_options.translation_error_rate() * travelled_distance +
         loop_trimmer_options.rotation_to_translation_error_rate() * accum_rotation * travelled_distance;
 
-    static kas_metrics::Collection<std::tuple<double, double, double, double, double>> trim_loops_col("trim_loops", nullptr,
+    static kas_utils::Collection<std::tuple<double, double, double, double, double>> trim_loops_col("trim_loops", nullptr,
         [](std::ostream& out) {
           out << "stamp" << ' ' << "max_rotation_error" << ' ' << "rotation_error" << ' ' <<
               "max_translation_error" << ' ' << "translation_error";
@@ -1285,7 +1285,7 @@ void PoseGraph3D::DrainWorkQueue() {
   }
   auto now_time = std::chrono::steady_clock::now();
   if (common::ToSeconds(now_time - last_log_time) > 3) {
-    static kas_metrics::Collection<long unsigned int> max_queue_size_col(
+    static kas_utils::Collection<long unsigned int> max_queue_size_col(
         "max_queue_size", max_queue_size_print_summary, nullptr, nullptr);
     max_queue_size_col.add(max_queue_size);
 
@@ -1296,7 +1296,7 @@ void PoseGraph3D::DrainWorkQueue() {
     max_queue_size = 0;
   }
 
-  static kas_metrics::Collection<double> work_item_processing_latency_col(
+  static kas_utils::Collection<double> work_item_processing_latency_col(
       "work_item_processing_latency", work_item_processing_latency_print_summary,
       nullptr, nullptr);
   while (process_work_queue) {

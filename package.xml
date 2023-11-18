@@ -50,7 +50,7 @@
   <depend>lua5.2-dev</depend>
   <depend>protobuf-dev</depend>
   
-  <depend>kas_metrics</depend>
+  <depend>kas_utils_cpp</depend>
 
   <export>
     <build_type>cmake</build_type>
