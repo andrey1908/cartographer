@@ -197,11 +197,10 @@ std::pair<bool, bool> PoseGraph3D::CheckIfConstraintCanBeAdded(
   }
   common::Duration global_constraint_search_after_n_seconds =
       common::FromSeconds(options_.global_constraint_search_after_n_seconds());
-  bool recently_connected =
-      (last_connection_time + global_constraint_search_after_n_seconds > latest_node_time);
-  if (node_id.trajectory_id == submap_id.trajectory_id ||
-      (connected &&
-        (global_constraint_search_after_n_seconds == common::Duration() || recently_connected))) {
+  bool recently_connected = connected &&
+      ((global_constraint_search_after_n_seconds < common::FromSeconds(0.)) ||
+          (latest_node_time - last_connection_time < global_constraint_search_after_n_seconds));
+  if (node_id.trajectory_id == submap_id.trajectory_id || recently_connected) {
     transform::Rigid3d global_node_pose =
         optimization_problem_->node_data().at(node_id).global_pose;
     transform::Rigid3d global_submap_pose =

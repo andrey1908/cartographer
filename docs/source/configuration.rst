@@ -175,7 +175,7 @@ bool log_residual_histograms
 double global_constraint_search_after_n_seconds
   If for the duration specified by this option no global contraint has been
   added between two trajectories, loop closure searches will be performed
-  globally rather than in a smaller search window.
+  globally rather than in a smaller search window. (< 0 - disabled)
 
 
 cartographer.mapping.proto.TrajectoryBuilderOptions
