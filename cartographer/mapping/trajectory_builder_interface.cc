@@ -56,10 +56,10 @@ void PopulateLoopTrimmerOptions(
   options->set_rotation_to_translation_error_rate(
       options_dictionary->GetDouble("rotation_to_translation_error_rate"));
 
-  options->set_trim_loops_in_window(
-      options_dictionary->GetBool("trim_loops_in_window"));
-  options->set_window_size_per_submap(
-      options_dictionary->GetInt("window_size_per_submap"));
+  options->set_trim_close_loops(
+      options_dictionary->GetBool("trim_close_loops"));
+  options->set_min_distance_in_nodes(
+      options_dictionary->GetInt("min_distance_in_nodes"));
 }
 
 void PopulatePoseGraphOdometryMotionFilterOptions(

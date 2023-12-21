@@ -9,6 +9,6 @@ message LoopTrimmerOptions {
   double translation_error_rate = 2;
   double rotation_to_translation_error_rate = 7;
 
-  bool trim_loops_in_window = 3;
-  int32 window_size_per_submap = 4;
+  bool trim_close_loops = 3;
+  int32 min_distance_in_nodes = 4;
 }

@@ -215,14 +215,14 @@ void LoopsTrimmer::TrimCloseLoops(std::vector<Constraint>& constraints) {
     const SubmapId& submap = std::get<0>(loop_ids);
     const NodeId& node = std::get<1>(loop_ids);
     if (submap != current_submap || node.trajectory_id != current_nodes_trajectory) {
-      if (options_it != loop_trimmer_options_.end() && options_it->second.trim_loops_in_window() &&
+      if (options_it != loop_trimmer_options_.end() && options_it->second.trim_close_loops() &&
           submap_nodes.size()) {
         const proto::LoopTrimmerOptions& options = options_it->second;
         std::sort(submap_nodes.rbegin(), submap_nodes.rend());
         for (auto weak_it = std::next(submap_nodes.begin()); weak_it != submap_nodes.end(); ++weak_it) {
           for (auto strong_it = submap_nodes.begin(); strong_it != weak_it; ++strong_it) {
             int distance = std::abs(strong_it->second.node_index - weak_it->second.node_index);
-            if (distance <= options.window_size_per_submap()) {
+            if (distance < options.min_distance_in_nodes()) {
               loops_to_remove.emplace(current_submap, weak_it->second);
               auto next_weak_it = submap_nodes.erase(weak_it);
               weak_it = std::prev(next_weak_it);
@@ -236,7 +236,7 @@ void LoopsTrimmer::TrimCloseLoops(std::vector<Constraint>& constraints) {
       submap_nodes.clear();
       options_it = loop_trimmer_options_.find(submap.trajectory_id);
     }
-    if (options_it == loop_trimmer_options_.end() || !options_it->second.trim_loops_in_window()) {
+    if (options_it == loop_trimmer_options_.end() || !options_it->second.trim_close_loops()) {
       continue;
     }
     submap_nodes.emplace_back(loop_score, node);
