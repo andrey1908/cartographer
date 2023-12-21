@@ -36,7 +36,6 @@
 #include "cartographer/mapping/internal/constraints/constraint_builder_3d.h"
 #include "cartographer/mapping/internal/optimization/optimization_problem_3d.h"
 #include "cartographer/mapping/internal/pose_graph_data.h"
-#include "cartographer/mapping/internal/pose_graph_constraints.h"
 #include "cartographer/mapping/internal/pose_graph_trajectory_states.h"
 #include "cartographer/mapping/internal/pose_graph_maps.h"
 #include "cartographer/mapping/internal/work_queue.h"
@@ -47,6 +46,7 @@
 #include "cartographer/sensor/odometry_data.h"
 #include "cartographer/sensor/point_cloud.h"
 #include "cartographer/transform/transform.h"
+#include "cartographer/mapping/internal/loops_trimmer.h"
 
 #include "kas_utils/time_measurer.h"
 
@@ -240,18 +240,6 @@ private:
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
 
-  std::vector<Constraint> TrimFalseDetectedLoops(
-      const std::vector<Constraint>& new_loops)
-          ABSL_LOCKS_EXCLUDED(mutex_)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
-  void TrimLoopsInWindow()
-      ABSL_LOCKS_EXCLUDED(mutex_)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
-  std::vector<Constraint> TrimLoops(
-      const std::vector<Constraint>& new_loops)
-          ABSL_LOCKS_EXCLUDED(mutex_)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
-
   void TrimPureLocalizationTrajectories()
       ABSL_LOCKS_EXCLUDED(mutex_)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
@@ -373,8 +361,6 @@ private:
 
   std::map<int, proto::PureLocalizationTrimmerOptions> pure_localization_trimmer_options_
       ABSL_GUARDED_BY(executing_work_item_mutex_);
-  std::map<int, proto::LoopTrimmerOptions> loop_trimmer_options_
-      ABSL_GUARDED_BY(executing_work_item_mutex_);
   std::set<int> pure_localization_trajectory_ids_
       ABSL_GUARDED_BY(executing_work_item_mutex_);
 
@@ -388,9 +374,10 @@ private:
   std::set<NodeId> nodes_scheduled_to_trim_ ABSL_GUARDED_BY(mutex_);
 
   PoseGraphData data_ ABSL_GUARDED_BY(mutex_);
-  PoseGraphConstraints constraints_ ABSL_GUARDED_BY(mutex_);
   PoseGraphTrajectoryStates trajectory_states_ ABSL_GUARDED_BY(mutex_);
   PoseGraphMaps maps_ ABSL_GUARDED_BY(mutex_);
+
+  LoopsTrimmer loops_trimmer_ ABSL_GUARDED_BY(mutex_);
 
   GlobalSlamOptimizationCallback global_slam_optimization_callback_
       ABSL_GUARDED_BY(executing_work_item_mutex_);

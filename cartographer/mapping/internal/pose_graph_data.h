@@ -26,6 +26,7 @@
 #include "cartographer/mapping/pose_graph.h"
 #include "cartographer/mapping/pose_graph_interface.h"
 #include "cartographer/mapping/submaps.h"
+#include "cartographer/mapping/constraint.h"
 
 namespace cartographer {
 namespace mapping {
@@ -45,6 +46,7 @@ struct PoseGraphData {
   std::map<std::string, PoseGraphInterface::LandmarkNode> landmark_nodes;
   int num_trajectory_nodes = 0;
   std::map<int, PoseGraph::InitialTrajectoryPose> initial_trajectory_poses;
+  std::vector<Constraint> constraints;
 };
 
 }  // namespace mapping
