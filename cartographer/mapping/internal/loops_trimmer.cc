@@ -2,11 +2,14 @@
 
 #include "glog/logging.h"
 
+#include "kas_utils/utils.hpp"
 #include "kas_utils/time_measurer.h"
 #include "kas_utils/collection.hpp"
 
 #include <cmath>
 #include <algorithm>
+
+using kas_utils::fastErase;
 
 namespace cartographer {
 namespace mapping {
@@ -257,12 +260,7 @@ void LoopsTrimmer::TrimCloseLoops(std::vector<Constraint>& constraints) {
     const NodeId& node = constraint.node_id;
     if (loops_to_remove.count(std::make_pair(submap, node))) {
       num_erased++;
-      if (constraint_it == std::prev(constraints.end())) {
-        constraints.pop_back();
-        break;
-      }
-      *constraint_it = constraints.back();
-      constraints.pop_back();
+      constraint_it = fastErase(constraints, constraint_it);
       continue;
     }
     ++constraint_it;
@@ -293,12 +291,7 @@ void LoopsTrimmer::TrimFalseLoops(
         constraint, global_submap_poses_3d, trajectory_nodes);
     if (rotation_error >= max_rotation_error || translation_error >= max_translation_error) {
       RemoveLoop(constraint.submap_id, constraint.node_id);
-      if (constraint_it == std::prev(constraints.end())) {
-        constraints.pop_back();
-        break;
-      }
-      *constraint_it = constraints.back();
-      constraints.pop_back();
+      constraint_it = fastErase(constraints, constraint_it);
       continue;
     }
     ++constraint_it;

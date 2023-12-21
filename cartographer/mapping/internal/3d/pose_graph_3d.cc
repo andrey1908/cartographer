@@ -38,6 +38,7 @@
 #include "cartographer/transform/transform.h"
 #include "glog/logging.h"
 
+#include "kas_utils/utils.hpp"
 #include "kas_utils/collection.hpp"
 
 namespace cartographer {
@@ -50,6 +51,8 @@ static auto* kConstraintsDifferentTrajectoryMetric = metrics::Gauge::Null();
 static auto* kActiveSubmapsMetric = metrics::Gauge::Null();
 static auto* kFrozenSubmapsMetric = metrics::Gauge::Null();
 static auto* kDeletedSubmapsMetric = metrics::Gauge::Null();
+
+using kas_utils::fastErase;
 
 PoseGraph3D::PoseGraph3D(
     const proto::PoseGraphOptions& options,
@@ -733,12 +736,7 @@ void PoseGraph3D::TrimSubmap(const SubmapId& submap_id) {
         }
         loops_trimmer_.RemoveLoop(constraint.submap_id, constraint.node_id);
       }
-      if (constraint_it == std::prev(data_.constraints.end())) {
-        data_.constraints.pop_back();
-        break;
-      }
-      *constraint_it = data_.constraints.back();
-      data_.constraints.pop_back();
+      constraint_it = fastErase(data_.constraints, constraint_it);
       continue;
     }
     ++constraint_it;
@@ -873,12 +871,7 @@ void PoseGraph3D::TrimNode(const NodeId& node_id) {
           continue;
         }
       }
-      if (constraint_it == std::prev(data_.constraints.end())) {
-        data_.constraints.pop_back();
-        break;
-      }
-      *constraint_it = data_.constraints.back();
-      data_.constraints.pop_back();
+      constraint_it = fastErase(data_.constraints, constraint_it);
       continue;
     }
     ++constraint_it;
@@ -891,12 +884,7 @@ void PoseGraph3D::TrimNode(const NodeId& node_id) {
       std::pair<SubmapId, NodeId> connection(constraint.submap_id, constraint.node_id);
       if (connections.count(connection)) {
         loops_trimmer_.RemoveLoop(constraint.submap_id, constraint.node_id);
-        if (constraint_it == std::prev(data_.constraints.end())) {
-          data_.constraints.pop_back();
-          break;
-        }
-        *constraint_it = data_.constraints.back();
-        data_.constraints.pop_back();
+        constraint_it = fastErase(data_.constraints, constraint_it);
         continue;
       } else {
         connections.insert(connection);
