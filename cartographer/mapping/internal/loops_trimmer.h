@@ -34,7 +34,7 @@ public:
   std::vector<Constraint> TrimFalseDetectedLoops(
       const std::vector<Constraint>& new_loops,
       const MapById<SubmapId, optimization::SubmapSpec3D>& global_submap_poses_3d,
-      const MapById<NodeId, TrajectoryNode>& trajectory_nodes);
+      const MapById<NodeId, TrajectoryNode>& trajectory_nodes) const;
   void TrimCloseLoops(std::vector<Constraint>& constraints);
 
   void TrimFalseLoops(
@@ -45,11 +45,11 @@ public:
 
 private:
   std::pair<double, double> GetARTDWithLoops(
-      const NodeId& node_1, const NodeId& node_2, float min_score);
+      const NodeId& node_1, const NodeId& node_2, float min_score) const;
   std::pair<double, double> GetLoopError(
       const Constraint& loop,
       const MapById<SubmapId, optimization::SubmapSpec3D>& global_submap_poses_3d,
-      const MapById<NodeId, TrajectoryNode>& trajectory_nodes);
+      const MapById<NodeId, TrajectoryNode>& trajectory_nodes) const;
 
 private:
   bool log_number_of_trimmed_loops_;

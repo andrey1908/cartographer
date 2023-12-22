@@ -64,7 +64,7 @@ void LoopsTrimmer::RemoveLoop(const SubmapId& submap, const NodeId& node) {
 std::vector<Constraint> LoopsTrimmer::TrimFalseDetectedLoops(
     const std::vector<Constraint>& new_loops,
     const MapById<SubmapId, optimization::SubmapSpec3D>& global_submap_poses_3d,
-    const MapById<NodeId, TrajectoryNode>& trajectory_nodes) {
+    const MapById<NodeId, TrajectoryNode>& trajectory_nodes) const {
   MEASURE_BLOCK_TIME(LoopsTrimmer__TrimFalseDetectedLoops);
 
   static kas_utils::Collection<std::tuple<double, double, double, double>> trim_loops_col("trim_loops", nullptr,
@@ -134,7 +134,7 @@ std::vector<Constraint> LoopsTrimmer::TrimFalseDetectedLoops(
 }
 
 std::pair<double, double> LoopsTrimmer::GetARTDWithLoops(
-    const NodeId& node_1, const NodeId& node_2, float min_score) {
+    const NodeId& node_1, const NodeId& node_2, float min_score) const {
   CHECK(node_1 < node_2);
 
   const auto& [ar_node_1, td_node_1] = artds_.at(node_1);
@@ -183,7 +183,7 @@ std::pair<double, double> LoopsTrimmer::GetARTDWithLoops(
 std::pair<double, double> LoopsTrimmer::GetLoopError(
     const Constraint& loop,
     const MapById<SubmapId, optimization::SubmapSpec3D>& global_submap_poses_3d,
-    const MapById<NodeId, TrajectoryNode>& trajectory_nodes) {
+    const MapById<NodeId, TrajectoryNode>& trajectory_nodes) const {
   const transform::Rigid3d& global_submap_pose =
       global_submap_poses_3d.at(loop.submap_id).global_pose;
   const transform::Rigid3d& global_node_pose =
