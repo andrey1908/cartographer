@@ -1546,7 +1546,7 @@ void PoseGraph3D::AddSerializedConstraints(
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    for (const auto& constraint : constraints) {
+    for (const Constraint& constraint : constraints) {
       CHECK(data_.trajectory_nodes.Contains(constraint.node_id));
       CHECK(data_.submap_data.Contains(constraint.submap_id));
       CHECK(data_.trajectory_nodes.at(constraint.node_id).constant_data !=
@@ -1566,7 +1566,6 @@ void PoseGraph3D::AddSerializedConstraints(
           break;
         case Constraint::Tag::INTER_SUBMAP:
           UpdateTrajectoryConnectivity(constraint);
-          loops_trimmer_.AddLoop(constraint);
           break;
       }
       data_.constraints.push_back(constraint);
@@ -1574,6 +1573,11 @@ void PoseGraph3D::AddSerializedConstraints(
     for (const auto& [submap_id, submap_data] : data_.submap_data) {
       CHECK(submap_data.node_ids.size());
       loops_trimmer_.AddSubmap(submap_id, *submap_data.node_ids.begin());
+    }
+    for (const Constraint& constraint : data_.constraints) {
+      if (constraint.tag == Constraint::INTER_SUBMAP) {
+        loops_trimmer_.AddLoop(constraint);
+      }
     }
     LOG(INFO) << "Loaded " << constraints.size() << " constraints.";
     return WorkItem::Result::kDoNotRunOptimization;
