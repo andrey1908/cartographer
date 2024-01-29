@@ -92,6 +92,7 @@ public:
       ABSL_LOCKS_EXCLUDED(mutex_)
       ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
   void FinishTrajectory(int trajectory_id) override
+      ABSL_LOCKS_EXCLUDED(mutex_)
       ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
   bool IsTrajectoryFinished(int trajectory_id) const override
       ABSL_LOCKS_EXCLUDED(mutex_);

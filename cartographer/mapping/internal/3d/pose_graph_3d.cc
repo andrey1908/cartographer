@@ -667,7 +667,10 @@ NodeId PoseGraph3D::AddNode(
   AddWorkItem([=]()
         ABSL_LOCKS_EXCLUDED(mutex_)
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
-    CHECK(trajectory_states_.CanModifyTrajectory(node_id.trajectory_id));
+    {
+      absl::MutexLock locker(&mutex_);
+      CHECK(trajectory_states_.CanModifyTrajectory(node_id.trajectory_id));
+    }
     return ComputeConstraintsForNode(node_id, insertion_submaps,
                                      newly_finished_submap);
   });
@@ -1333,35 +1336,35 @@ void PoseGraph3D::DeleteTrajectory(int trajectory_id) {
   {
     absl::MutexLock locker(&mutex_);
     trajectory_states_.ScheduleTrajectoryForDeletion(trajectory_id);
-
-    AddWorkItem([this, trajectory_id]()
-          ABSL_LOCKS_EXCLUDED(mutex_)
-          ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
-      absl::MutexLock queue_locker(&executing_work_item_mutex_);
-      absl::MutexLock locker(&mutex_);
-      trajectory_states_.PrepareTrajectoryForDeletion(trajectory_id);
-      return WorkItem::Result::kDoNotRunOptimization;
-    });
   }
+
+  AddWorkItem([this, trajectory_id]()
+        ABSL_LOCKS_EXCLUDED(mutex_)
+        ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
+    absl::MutexLock queue_locker(&executing_work_item_mutex_);
+    absl::MutexLock locker(&mutex_);
+    trajectory_states_.PrepareTrajectoryForDeletion(trajectory_id);
+    return WorkItem::Result::kDoNotRunOptimization;
+  });
 }
 
 void PoseGraph3D::FinishTrajectory(int trajectory_id) {
   {
     absl::MutexLock locker(&mutex_);
     trajectory_states_.ScheduleTrajectoryForFinish(trajectory_id);
-
-    AddWorkItem([this, trajectory_id]()
-          ABSL_LOCKS_EXCLUDED(mutex_)
-          ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
-      absl::MutexLock queue_locker(&executing_work_item_mutex_);
-      absl::MutexLock locker(&mutex_);
-      trajectory_states_.FinishTrajectory(trajectory_id);
-      for (const auto& submap : data_.submap_data.trajectory(trajectory_id)) {
-        data_.submap_data.at(submap.id).state = SubmapState::kFinished;
-      }
-      return WorkItem::Result::kRunOptimization;
-    });
   }
+
+  AddWorkItem([this, trajectory_id]()
+        ABSL_LOCKS_EXCLUDED(mutex_)
+        ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
+    absl::MutexLock queue_locker(&executing_work_item_mutex_);
+    absl::MutexLock locker(&mutex_);
+    trajectory_states_.FinishTrajectory(trajectory_id);
+    for (const auto& submap : data_.submap_data.trajectory(trajectory_id)) {
+      data_.submap_data.at(submap.id).state = SubmapState::kFinished;
+    }
+    return WorkItem::Result::kRunOptimization;
+  });
 }
 
 bool PoseGraph3D::IsTrajectoryFinished(int trajectory_id) const {
@@ -1373,26 +1376,26 @@ void PoseGraph3D::FreezeTrajectory(int trajectory_id) {
   {
     absl::MutexLock locker(&mutex_);
     trajectory_states_.ScheduleTrajectoryForFreezing(trajectory_id);
-
-    AddWorkItem([this, trajectory_id]()
-          ABSL_LOCKS_EXCLUDED(mutex_)
-          ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
-      absl::MutexLock queue_locker(&executing_work_item_mutex_);
-      absl::MutexLock locker(&mutex_);
-      for (const auto& [other_trajectory_id, other_trajectory_state] : trajectory_states_) {
-        if (!trajectory_states_.IsTrajectoryFrozen(other_trajectory_id)) {
-          continue;
-        }
-        if (trajectory_states_.TransitivelyConnected(trajectory_id, other_trajectory_id)) {
-          continue;
-        }
-        trajectory_states_.Connect(
-            trajectory_id, other_trajectory_id, common::FromUniversal(0));
-      }
-      trajectory_states_.FreezeTrajectory(trajectory_id);
-      return WorkItem::Result::kDoNotRunOptimization;
-    });
   }
+
+  AddWorkItem([this, trajectory_id]()
+        ABSL_LOCKS_EXCLUDED(mutex_)
+        ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
+    absl::MutexLock queue_locker(&executing_work_item_mutex_);
+    absl::MutexLock locker(&mutex_);
+    for (const auto& [other_trajectory_id, other_trajectory_state] : trajectory_states_) {
+      if (!trajectory_states_.IsTrajectoryFrozen(other_trajectory_id)) {
+        continue;
+      }
+      if (trajectory_states_.TransitivelyConnected(trajectory_id, other_trajectory_id)) {
+        continue;
+      }
+      trajectory_states_.Connect(
+          trajectory_id, other_trajectory_id, common::FromUniversal(0));
+    }
+    trajectory_states_.FreezeTrajectory(trajectory_id);
+    return WorkItem::Result::kDoNotRunOptimization;
+  });
 }
 
 bool PoseGraph3D::IsTrajectoryFrozen(int trajectory_id) const {
