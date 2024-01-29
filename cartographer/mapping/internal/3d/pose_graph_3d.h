@@ -348,7 +348,7 @@ private:
 private:
   mutable absl::Mutex mutex_;
   absl::Mutex work_queue_mutex_;
-  absl::Mutex executing_work_item_mutex_;
+  absl::Mutex executing_work_item_mutex_;  // this mutex is used only for annotations
 
   const proto::PoseGraphOptions options_;
   std::unique_ptr<optimization::OptimizationProblem3D> optimization_problem_;
