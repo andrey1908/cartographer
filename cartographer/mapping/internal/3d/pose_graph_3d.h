@@ -102,9 +102,9 @@ public:
       ABSL_LOCKS_EXCLUDED(mutex_);
 
   void ScheduleNodesToTrim(const std::set<common::Time>& nodes_to_trim) override
-      ABSL_LOCKS_EXCLUDED(mutex_);
+      ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
   void ScheduleNodesToTrim(const std::set<NodeId>& nodes_to_trim) override
-      ABSL_LOCKS_EXCLUDED(mutex_);
+      ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
 
   void AddSubmapFromProto(
       const transform::Rigid3d& global_submap_pose,
@@ -371,7 +371,7 @@ private:
   std::set<SubmapId> submaps_used_for_global_constraints_
       ABSL_GUARDED_BY(executing_work_item_mutex_);
 
-  std::set<NodeId> nodes_scheduled_to_trim_ ABSL_GUARDED_BY(mutex_);
+  std::set<NodeId> nodes_scheduled_to_trim_ ABSL_GUARDED_BY(executing_work_item_mutex_);
 
   PoseGraphData data_ ABSL_GUARDED_BY(mutex_);
   PoseGraphTrajectoryStates trajectory_states_ ABSL_GUARDED_BY(mutex_);

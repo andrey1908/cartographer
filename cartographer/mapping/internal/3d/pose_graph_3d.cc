@@ -1401,22 +1401,32 @@ bool PoseGraph3D::IsTrajectoryFrozen(int trajectory_id) const {
 }
 
 void PoseGraph3D::ScheduleNodesToTrim(const std::set<common::Time>& nodes_to_trim) {
-  absl::MutexLock locker(&mutex_);
-  for (const auto& node : data_.trajectory_nodes) {
-    if (nodes_to_trim.count(node.data.constant_data->time)) {
-      nodes_scheduled_to_trim_.insert(node.id);
+  AddWorkItem([this, nodes_to_trim]()
+        ABSL_LOCKS_EXCLUDED(mutex_)
+        ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
+    absl::MutexLock queue_locker(&executing_work_item_mutex_);
+    absl::MutexLock locker(&mutex_);
+    for (const auto& node : data_.trajectory_nodes) {
+      if (nodes_to_trim.count(node.data.constant_data->time)) {
+        nodes_scheduled_to_trim_.insert(node.id);
+      }
     }
-  }
+    return WorkItem::Result::kDoNotRunOptimization;
+  });
 }
 
 void PoseGraph3D::ScheduleNodesToTrim(const std::set<NodeId>& nodes_to_trim) {
-  absl::MutexLock locker(&mutex_);
-  std::set<NodeId> merged;
-  std::set_union(
-    nodes_scheduled_to_trim_.begin(), nodes_scheduled_to_trim_.end(),
-    nodes_to_trim.begin(), nodes_to_trim.end(),
-    std::inserter(merged, merged.end()));
-  nodes_scheduled_to_trim_ = std::move(merged);
+  AddWorkItem([this, nodes_to_trim]()
+        ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
+    absl::MutexLock queue_locker(&executing_work_item_mutex_);
+    std::set<NodeId> merged;
+    std::set_union(
+      nodes_scheduled_to_trim_.begin(), nodes_scheduled_to_trim_.end(),
+      nodes_to_trim.begin(), nodes_to_trim.end(),
+      std::inserter(merged, merged.end()));
+    nodes_scheduled_to_trim_ = std::move(merged);
+    return WorkItem::Result::kDoNotRunOptimization;
+  });
 }
 
 void PoseGraph3D::AddSubmapFromProto(
