@@ -35,7 +35,6 @@
 #include "cartographer/mapping/3d/submap_3d.h"
 #include "cartographer/mapping/internal/constraints/constraint_builder_3d.h"
 #include "cartographer/mapping/internal/optimization/optimization_problem_3d.h"
-#include "cartographer/mapping/internal/pose_graph_data.h"
 #include "cartographer/mapping/internal/pose_graph_trajectory_states.h"
 #include "cartographer/mapping/internal/pose_graph_maps.h"
 #include "cartographer/mapping/internal/work_queue.h"
@@ -52,6 +51,14 @@
 
 namespace cartographer {
 namespace mapping {
+
+enum class SubmapState { kNoConstraintSearch, kFinished };
+
+struct InternalSubmapData {
+  std::shared_ptr<const Submap> submap;
+  SubmapState state = SubmapState::kNoConstraintSearch;
+  std::set<NodeId> node_ids;
+};
 
 class PoseGraph3D : public PoseGraph {
 public:
@@ -374,7 +381,13 @@ private:
 
   std::set<NodeId> nodes_scheduled_to_trim_ ABSL_GUARDED_BY(executing_work_item_mutex_);
 
-  PoseGraphData data_ ABSL_GUARDED_BY(mutex_);
+  MapById<SubmapId, InternalSubmapData> submap_data_ ABSL_GUARDED_BY(mutex_);
+  MapById<SubmapId, optimization::SubmapSpec3D> global_submap_poses_3d_ ABSL_GUARDED_BY(mutex_);
+  MapById<NodeId, TrajectoryNode> trajectory_nodes_ ABSL_GUARDED_BY(mutex_);
+  std::map<std::string, PoseGraphInterface::LandmarkNode> landmark_nodes_ ABSL_GUARDED_BY(mutex_);
+  int num_trajectory_nodes_ = 0 ABSL_GUARDED_BY(mutex_);
+  std::map<int, PoseGraph::InitialTrajectoryPose> initial_trajectory_poses_ ABSL_GUARDED_BY(mutex_);
+  std::vector<Constraint> constraints_ ABSL_GUARDED_BY(mutex_);
   PoseGraphTrajectoryStates trajectory_states_ ABSL_GUARDED_BY(mutex_);
   PoseGraphMaps maps_ ABSL_GUARDED_BY(mutex_);
 

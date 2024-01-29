@@ -159,7 +159,7 @@ void PoseGraph3D::AddLandmarkData(
     absl::MutexLock locker(&mutex_);
     CHECK(trajectory_states_.CanModifyTrajectory(trajectory_id));
     for (const auto& observation : landmark_data.landmark_observations) {
-      data_.landmark_nodes[observation.id].landmark_observations.emplace_back(
+      landmark_nodes_[observation.id].landmark_observations.emplace_back(
           PoseGraphInterface::LandmarkNode::LandmarkObservation{
               trajectory_id, landmark_data.time,
               observation.landmark_to_tracking_transform,
@@ -188,8 +188,8 @@ std::pair<bool, bool> PoseGraph3D::CheckIfConstraintCanBeAdded(
   bool connected;
   {
     absl::MutexLock locker(&mutex_);
-    CHECK(data_.submap_data.at(submap_id).state == SubmapState::kFinished);
-    if (!data_.submap_data.at(submap_id).submap->insertion_finished()) {
+    CHECK(submap_data_.at(submap_id).state == SubmapState::kFinished);
+    if (!submap_data_.at(submap_id).submap->insertion_finished()) {
       // this happens when unfinished submap was loaded from file
       return std::make_pair(false, false);
     }
@@ -233,7 +233,7 @@ PoseGraph3D::ComputeCandidatesForConstraints(const NodeId& node_id) {
     }
     {
       absl::MutexLock locker(&mutex_);
-      if (data_.submap_data.at(submap_id).node_ids.count(node_id)) {
+      if (submap_data_.at(submap_id).node_ids.count(node_id)) {
         continue;
       }
     }
@@ -256,7 +256,7 @@ PoseGraph3D::ComputeCandidatesForConstraints(const SubmapId& submap_id) {
   std::set<NodeId> submap_node_ids;
   {
     absl::MutexLock locker(&mutex_);
-    submap_node_ids = data_.submap_data.at(submap_id).node_ids;
+    submap_node_ids = submap_data_.at(submap_id).node_ids;
   }
   bool pure_localization_trajectory =
       pure_localization_trajectory_ids_.count(submap_id.trajectory_id);
@@ -391,7 +391,7 @@ void PoseGraph3D::MaybeAddConstraints(const NodeId& node_id,
   const TrajectoryNode::Data* constant_data;
   {
     absl::MutexLock locker(&mutex_);
-    constant_data = data_.trajectory_nodes.at(node_id).constant_data.get();
+    constant_data = trajectory_nodes_.at(node_id).constant_data.get();
   }
 
   for (const SubmapId& submap_id : local_submap_ids) {
@@ -400,7 +400,7 @@ void PoseGraph3D::MaybeAddConstraints(const NodeId& node_id,
     const Submap3D* submap;
     {
       absl::MutexLock locker(&mutex_);
-      submap = static_cast<const Submap3D*>(data_.submap_data.at(submap_id).submap.get());
+      submap = static_cast<const Submap3D*>(submap_data_.at(submap_id).submap.get());
     }
     constraint_builder_.MaybeAddConstraint(
         submap_id, submap, node_id, constant_data,
@@ -413,7 +413,7 @@ void PoseGraph3D::MaybeAddConstraints(const NodeId& node_id,
     const Submap3D* submap;
     {
       absl::MutexLock locker(&mutex_);
-      submap = static_cast<const Submap3D*>(data_.submap_data.at(submap_id).submap.get());
+      submap = static_cast<const Submap3D*>(submap_data_.at(submap_id).submap.get());
     }
     constraint_builder_.MaybeAddGlobalConstraint(
         submap_id, submap, node_id, constant_data,
@@ -429,7 +429,7 @@ void PoseGraph3D::MaybeAddConstraints(const SubmapId& submap_id,
   const Submap3D* submap;
   {
     absl::MutexLock locker(&mutex_);
-    submap = static_cast<const Submap3D*>(data_.submap_data.at(submap_id).submap.get());
+    submap = static_cast<const Submap3D*>(submap_data_.at(submap_id).submap.get());
   }
 
   for (const NodeId& node_id : local_node_ids) {
@@ -438,7 +438,7 @@ void PoseGraph3D::MaybeAddConstraints(const SubmapId& submap_id,
     const TrajectoryNode::Data* constant_data;
     {
       absl::MutexLock locker(&mutex_);
-      constant_data = data_.trajectory_nodes.at(node_id).constant_data.get();
+      constant_data = trajectory_nodes_.at(node_id).constant_data.get();
     }
     constraint_builder_.MaybeAddConstraint(
         submap_id, submap, node_id, constant_data,
@@ -451,7 +451,7 @@ void PoseGraph3D::MaybeAddConstraints(const SubmapId& submap_id,
     const TrajectoryNode::Data* constant_data;
     {
       absl::MutexLock locker(&mutex_);
-      constant_data = data_.trajectory_nodes.at(node_id).constant_data.get();
+      constant_data = trajectory_nodes_.at(node_id).constant_data.get();
     }
     constraint_builder_.MaybeAddGlobalConstraint(
         submap_id, submap, node_id, constant_data,
@@ -467,27 +467,27 @@ std::vector<SubmapId> PoseGraph3D::InitializeGlobalSubmapPoses(
   if (insertion_submaps.size() == 1) {
     // If we don't already have an entry for the first submap, add one.
     if (submap_data.SizeOfTrajectoryOrZero(trajectory_id) == 0) {
-      if (data_.initial_trajectory_poses.count(trajectory_id) > 0) {
+      if (initial_trajectory_poses_.count(trajectory_id) > 0) {
         trajectory_states_.Connect(
             trajectory_id,
-            data_.initial_trajectory_poses.at(trajectory_id).to_trajectory_id,
+            initial_trajectory_poses_.at(trajectory_id).to_trajectory_id,
             time);
       }
       optimization_problem_->AddSubmap(
           trajectory_id, ComputeLocalToGlobalTransform(
-                             data_.global_submap_poses_3d, trajectory_id) *
+                             global_submap_poses_3d_, trajectory_id) *
                              insertion_submaps[0]->local_pose());
     }
     CHECK_EQ(1, submap_data.SizeOfTrajectoryOrZero(trajectory_id));
     const SubmapId submap_id{trajectory_id, 0};
-    CHECK(data_.submap_data.at(submap_id).submap == insertion_submaps.front());
+    CHECK(submap_data_.at(submap_id).submap == insertion_submaps.front());
     return {submap_id};
   }
   CHECK_EQ(2, insertion_submaps.size());
   const auto end_it = submap_data.EndOfTrajectory(trajectory_id);
   CHECK(submap_data.BeginOfTrajectory(trajectory_id) != end_it);
   const SubmapId last_submap_id = std::prev(end_it)->id;
-  if (data_.submap_data.at(last_submap_id).submap ==
+  if (submap_data_.at(last_submap_id).submap ==
       insertion_submaps.front()) {
     // In this case, 'last_submap_id' is the ID of 'insertions_submaps.front()'
     // and 'insertions_submaps.back()' is new.
@@ -499,11 +499,11 @@ std::vector<SubmapId> PoseGraph3D::InitializeGlobalSubmapPoses(
     return {last_submap_id,
             SubmapId{trajectory_id, last_submap_id.submap_index + 1}};
   }
-  CHECK(data_.submap_data.at(last_submap_id).submap ==
+  CHECK(submap_data_.at(last_submap_id).submap ==
         insertion_submaps.back());
   const SubmapId front_submap_id{trajectory_id,
                                  last_submap_id.submap_index - 1};
-  CHECK(data_.submap_data.at(front_submap_id).submap ==
+  CHECK(submap_data_.at(front_submap_id).submap ==
         insertion_submaps.front());
   return {front_submap_id, last_submap_id};
 }
@@ -517,7 +517,7 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
   {
     absl::MutexLock locker(&mutex_);
     const auto& constant_data =
-        data_.trajectory_nodes.at(node_id).constant_data;
+        trajectory_nodes_.at(node_id).constant_data;
     submap_ids = InitializeGlobalSubmapPoses(
         node_id.trajectory_id, constant_data->time, insertion_submaps);
     CHECK_EQ(submap_ids.size(), insertion_submaps.size());
@@ -532,14 +532,14 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
     for (size_t i = 0; i < insertion_submaps.size(); ++i) {
       const SubmapId submap_id = submap_ids[i];
       // Even if this was the last node added to 'submap_id', the submap will
-      // only be marked as finished in 'data_.submap_data' further below.
-      CHECK(data_.submap_data.at(submap_id).state ==
+      // only be marked as finished in 'submap_data_' further below.
+      CHECK(submap_data_.at(submap_id).state ==
             SubmapState::kNoConstraintSearch);
-      data_.submap_data.at(submap_id).node_ids.emplace(node_id);
-      data_.trajectory_nodes.at(node_id).submap_ids.emplace_back(submap_id);
+      submap_data_.at(submap_id).node_ids.emplace(node_id);
+      trajectory_nodes_.at(node_id).submap_ids.emplace_back(submap_id);
       const transform::Rigid3d constraint_transform =
           insertion_submaps[i]->local_pose().inverse() * local_pose;
-      data_.constraints.push_back(Constraint{
+      constraints_.push_back(Constraint{
           submap_id,
           node_id,
           {constraint_transform, options_.matcher_translation_weight(),
@@ -549,7 +549,7 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
     if (newly_finished_submap) {
       const SubmapId newly_finished_submap_id = submap_ids.front();
       InternalSubmapData& finished_submap_data =
-          data_.submap_data.at(newly_finished_submap_id);
+          submap_data_.at(newly_finished_submap_id);
       CHECK(finished_submap_data.state == SubmapState::kNoConstraintSearch);
       finished_submap_data.state = SubmapState::kFinished;
     }
@@ -584,7 +584,7 @@ WorkItem::Result PoseGraph3D::ComputeConstraintsForNode(
     int newly_finished_submap_num_nodes;
     {
       absl::MutexLock locker(&mutex_);
-      newly_finished_submap_num_nodes = data_.submap_data.at(newly_finished_submap_id).node_ids.size();
+      newly_finished_submap_num_nodes = submap_data_.at(newly_finished_submap_id).node_ids.size();
     }
     std::vector<NodeId> node_candidates_for_local_constraints;
     std::vector<NodeId> node_candidates_for_global_constraints;
@@ -628,19 +628,19 @@ NodeId PoseGraph3D::AppendNode(
   if (!trajectory_states_.ContainsTrajectory(trajectory_id)) {
     trajectory_states_.AddTrajectory(trajectory_id);
   }
-  const NodeId node_id = data_.trajectory_nodes.Append(
+  const NodeId node_id = trajectory_nodes_.Append(
       trajectory_id, TrajectoryNode{constant_data, optimized_pose});
-  data_.trajectory_nodes.at(node_id).submap_ids.reserve(2);
-  ++data_.num_trajectory_nodes;
+  trajectory_nodes_.at(node_id).submap_ids.reserve(2);
+  ++num_trajectory_nodes_;
   // Test if the 'insertion_submap.back()' is one we never saw before.
-  if (data_.submap_data.SizeOfTrajectoryOrZero(trajectory_id) == 0 ||
-      std::prev(data_.submap_data.EndOfTrajectory(trajectory_id))
+  if (submap_data_.SizeOfTrajectoryOrZero(trajectory_id) == 0 ||
+      std::prev(submap_data_.EndOfTrajectory(trajectory_id))
               ->data.submap != insertion_submaps.back()) {
-    // We grow 'data_.submap_data' as needed. This code assumes that the first
+    // We grow 'submap_data_' as needed. This code assumes that the first
     // time we see a new submap is as 'insertion_submaps.back()'.
     const SubmapId submap_id =
-        data_.submap_data.Append(trajectory_id, InternalSubmapData());
-    data_.submap_data.at(submap_id).submap = insertion_submaps.back();
+        submap_data_.Append(trajectory_id, InternalSubmapData());
+    submap_data_.at(submap_id).submap = insertion_submaps.back();
     loops_trimmer_.AddSubmap(submap_id, node_id);
     kActiveSubmapsMetric->Increment();
   }
@@ -679,14 +679,14 @@ NodeId PoseGraph3D::AddNode(
 
 common::Time PoseGraph3D::GetLatestNodeTime(
     const NodeId& node_id, const SubmapId& submap_id) const {
-  common::Time time = data_.trajectory_nodes.at(node_id).constant_data->time;
-  const InternalSubmapData& submap_data = data_.submap_data.at(submap_id);
+  common::Time time = trajectory_nodes_.at(node_id).constant_data->time;
+  const InternalSubmapData& submap_data = submap_data_.at(submap_id);
   if (!submap_data.node_ids.empty()) {
     const NodeId last_submap_node_id =
-        *data_.submap_data.at(submap_id).node_ids.rbegin();
+        *submap_data_.at(submap_id).node_ids.rbegin();
     time = std::max(
         time,
-        data_.trajectory_nodes.at(last_submap_node_id).constant_data->time);
+        trajectory_nodes_.at(last_submap_node_id).constant_data->time);
   }
   return time;
 }
@@ -703,12 +703,12 @@ void PoseGraph3D::UpdateTrajectoryConnectivity(const Constraint& constraint) {
 void PoseGraph3D::TrimSubmap(const SubmapId& submap_id) {
   // TODO(hrapp): We have to make sure that the trajectory has been finished
   // if we want to delete the last submaps.
-  CHECK(data_.submap_data.Contains(submap_id));
-  CHECK(data_.submap_data.at(submap_id).state == SubmapState::kFinished);
+  CHECK(submap_data_.Contains(submap_id));
+  CHECK(submap_data_.at(submap_id).state == SubmapState::kFinished);
 
-  for (const NodeId& node_id : data_.submap_data.at(submap_id).node_ids) {
+  for (const NodeId& node_id : submap_data_.at(submap_id).node_ids) {
     std::vector<SubmapId>& submap_ids_for_node =
-        data_.trajectory_nodes.at(node_id).submap_ids;
+        trajectory_nodes_.at(node_id).submap_ids;
     auto it = std::find(submap_ids_for_node.begin(),
         submap_ids_for_node.end(), submap_id);
     CHECK(it != submap_ids_for_node.end());
@@ -716,7 +716,7 @@ void PoseGraph3D::TrimSubmap(const SubmapId& submap_id) {
   }
 
   std::set<NodeId> nodes_to_retain;
-  for (const auto& submap_data : data_.submap_data) {
+  for (const auto& submap_data : submap_data_) {
     if (submap_data.id != submap_id) {
       nodes_to_retain.insert(submap_data.data.node_ids.begin(),
                              submap_data.data.node_ids.end());
@@ -724,13 +724,13 @@ void PoseGraph3D::TrimSubmap(const SubmapId& submap_id) {
   }
 
   std::set<NodeId> nodes_to_remove;
-  std::set_difference(data_.submap_data.at(submap_id).node_ids.begin(),
-                      data_.submap_data.at(submap_id).node_ids.end(),
+  std::set_difference(submap_data_.at(submap_id).node_ids.begin(),
+                      submap_data_.at(submap_id).node_ids.end(),
                       nodes_to_retain.begin(), nodes_to_retain.end(),
                       std::inserter(nodes_to_remove, nodes_to_remove.begin()));
 
   std::set<SubmapId> other_submap_ids_losing_constraints;
-  for (auto constraint_it = data_.constraints.begin(); constraint_it != data_.constraints.end();) {
+  for (auto constraint_it = constraints_.begin(); constraint_it != constraints_.end();) {
     const Constraint& constraint = *constraint_it;
     if (constraint.submap_id == submap_id || nodes_to_remove.count(constraint.node_id)) {
       if (constraint.tag == Constraint::INTER_SUBMAP) {
@@ -739,13 +739,13 @@ void PoseGraph3D::TrimSubmap(const SubmapId& submap_id) {
         }
         loops_trimmer_.RemoveLoop(constraint.submap_id, constraint.node_id);
       }
-      constraint_it = fastErase(data_.constraints, constraint_it);
+      constraint_it = fastErase(constraints_, constraint_it);
       continue;
     }
     ++constraint_it;
   }
 
-  for (const Constraint& constraint : data_.constraints) {
+  for (const Constraint& constraint : constraints_) {
     if (constraint.tag == Constraint::Tag::INTER_SUBMAP) {
       other_submap_ids_losing_constraints.erase(constraint.submap_id);
     }
@@ -755,12 +755,12 @@ void PoseGraph3D::TrimSubmap(const SubmapId& submap_id) {
     constraint_builder_.DeleteScanMatcher(submap_id);
   }
 
-  data_.submap_data.Trim(submap_id);
+  submap_data_.Trim(submap_id);
   constraint_builder_.DeleteScanMatcher(submap_id);
   optimization_problem_->TrimSubmap(submap_id);
 
   for (const NodeId& node_id : nodes_to_remove) {
-    data_.trajectory_nodes.Trim(node_id);
+    trajectory_nodes_.Trim(node_id);
     optimization_problem_->TrimTrajectoryNode(node_id);
   }
 
@@ -774,8 +774,8 @@ void PoseGraph3D::TrimSubmap(const SubmapId& submap_id) {
 
 void PoseGraph3D::ReattachLoop(Constraint& loop, const NodeId& to_node_id) {
   CHECK(loop.tag == Constraint::INTER_SUBMAP);
-  const transform::Rigid3d& node_pose = data_.trajectory_nodes.at(loop.node_id).global_pose;
-  const transform::Rigid3d& to_node_pose = data_.trajectory_nodes.at(to_node_id).global_pose;
+  const transform::Rigid3d& node_pose = trajectory_nodes_.at(loop.node_id).global_pose;
+  const transform::Rigid3d& to_node_pose = trajectory_nodes_.at(to_node_id).global_pose;
   transform::Rigid3d correction = node_pose.inverse() * to_node_pose;
   loop.node_id = to_node_id;
   loop.pose.zbar_ij = loop.pose.zbar_ij * correction;
@@ -783,8 +783,8 @@ void PoseGraph3D::ReattachLoop(Constraint& loop, const NodeId& to_node_id) {
 
 void PoseGraph3D::ReattachLoop(Constraint& loop, const SubmapId& to_submap_id) {
   CHECK(loop.tag == Constraint::INTER_SUBMAP);
-  const transform::Rigid3d& submap_pose = data_.global_submap_poses_3d.at(loop.submap_id).global_pose;
-  const transform::Rigid3d& to_submap_pose = data_.global_submap_poses_3d.at(to_submap_id).global_pose;
+  const transform::Rigid3d& submap_pose = global_submap_poses_3d_.at(loop.submap_id).global_pose;
+  const transform::Rigid3d& to_submap_pose = global_submap_poses_3d_.at(to_submap_id).global_pose;
   transform::Rigid3d correction = to_submap_pose.inverse() * submap_pose;
   loop.submap_id = to_submap_id;
   loop.pose.zbar_ij = correction * loop.pose.zbar_ij;
@@ -793,26 +793,26 @@ void PoseGraph3D::ReattachLoop(Constraint& loop, const SubmapId& to_submap_id) {
 void PoseGraph3D::TrimNode(const NodeId& node_id) {
   MEASURE_BLOCK_TIME(TrimNode);
 
-  CHECK(data_.trajectory_nodes.Contains(node_id));
-  for (const SubmapId& submap_id : data_.trajectory_nodes.at(node_id).submap_ids) {
-    CHECK(data_.submap_data.at(submap_id).state == SubmapState::kFinished);
+  CHECK(trajectory_nodes_.Contains(node_id));
+  for (const SubmapId& submap_id : trajectory_nodes_.at(node_id).submap_ids) {
+    CHECK(submap_data_.at(submap_id).state == SubmapState::kFinished);
   }
 
   std::vector<SubmapId> submap_ids;
-  for (const auto& submap_data : data_.submap_data) {
+  for (const auto& submap_data : submap_data_) {
     auto it = submap_data.data.node_ids.find(node_id);
     if (it != submap_data.data.node_ids.end()) {
       if (submap_data.data.node_ids.size() == 1) {
         submap_ids.push_back(submap_data.id);
       } else {
-        data_.submap_data.at(submap_data.id).node_ids.erase(it);
+        submap_data_.at(submap_data.id).node_ids.erase(it);
       }
     }
   }
   CHECK(submap_ids.size() <= 2);
 
   std::vector<Constraint> new_constraints;
-  for (auto constraint_it = data_.constraints.begin(); constraint_it != data_.constraints.end();) {
+  for (auto constraint_it = constraints_.begin(); constraint_it != constraints_.end();) {
     const Constraint& constraint = *constraint_it;
     if (constraint.node_id == node_id ||
         std::find(submap_ids.begin(), submap_ids.end(), constraint.submap_id) != submap_ids.end()) {
@@ -820,25 +820,25 @@ void PoseGraph3D::TrimNode(const NodeId& node_id) {
         Constraint new_constraint = constraint;
         bool drop_loop = false;
         if (constraint.node_id == node_id) {
-          auto it = data_.trajectory_nodes.find(new_constraint.node_id);
-          CHECK(it != data_.trajectory_nodes.end());
-          if (it != data_.trajectory_nodes.BeginOfTrajectory(it->id.trajectory_id)) {
+          auto it = trajectory_nodes_.find(new_constraint.node_id);
+          CHECK(it != trajectory_nodes_.end());
+          if (it != trajectory_nodes_.BeginOfTrajectory(it->id.trajectory_id)) {
             ReattachLoop(new_constraint, std::prev(it)->id);
-          } else if (data_.trajectory_nodes.SizeOfTrajectoryOrZero(it->id.trajectory_id) >= 2) {
+          } else if (trajectory_nodes_.SizeOfTrajectoryOrZero(it->id.trajectory_id) >= 2) {
             ReattachLoop(new_constraint, std::next(it)->id);
           } else {
             drop_loop = true;
           }
         }
         if (std::find(submap_ids.begin(), submap_ids.end(), constraint.submap_id) != submap_ids.end()) {
-          auto it = data_.global_submap_poses_3d.find(constraint.submap_id);
-          CHECK(it != data_.global_submap_poses_3d.end());
+          auto it = global_submap_poses_3d_.find(constraint.submap_id);
+          CHECK(it != global_submap_poses_3d_.end());
           int back_dist = 0;
           int forth_dist = 0;
           auto back_it = it;
           auto forth_it = it;
           while (std::find(submap_ids.begin(), submap_ids.end(), back_it->id) != submap_ids.end()) {
-            if (back_it == data_.global_submap_poses_3d.BeginOfTrajectory(back_it->id.trajectory_id)) {
+            if (back_it == global_submap_poses_3d_.BeginOfTrajectory(back_it->id.trajectory_id)) {
               back_dist = std::numeric_limits<int>::max();
               break;
             }
@@ -848,7 +848,7 @@ void PoseGraph3D::TrimNode(const NodeId& node_id) {
           while (std::find(submap_ids.begin(), submap_ids.end(), forth_it->id) != submap_ids.end()) {
             ++forth_it;
             forth_dist++;
-            if (forth_it == data_.global_submap_poses_3d.EndOfTrajectory(forth_it->id.trajectory_id)) {
+            if (forth_it == global_submap_poses_3d_.EndOfTrajectory(forth_it->id.trajectory_id)) {
               forth_dist = std::numeric_limits<int>::max();
               break;
             }
@@ -874,20 +874,20 @@ void PoseGraph3D::TrimNode(const NodeId& node_id) {
           continue;
         }
       }
-      constraint_it = fastErase(data_.constraints, constraint_it);
+      constraint_it = fastErase(constraints_, constraint_it);
       continue;
     }
     ++constraint_it;
   }
 
   std::set<std::pair<SubmapId, NodeId>> connections;
-  for (auto constraint_it = data_.constraints.begin(); constraint_it != data_.constraints.end();) {
+  for (auto constraint_it = constraints_.begin(); constraint_it != constraints_.end();) {
     const Constraint& constraint = *constraint_it;
     if (constraint.tag == Constraint::INTER_SUBMAP) {
       std::pair<SubmapId, NodeId> connection(constraint.submap_id, constraint.node_id);
       if (connections.count(connection)) {
         loops_trimmer_.RemoveLoop(constraint.submap_id, constraint.node_id);
-        constraint_it = fastErase(data_.constraints, constraint_it);
+        constraint_it = fastErase(constraints_, constraint_it);
         continue;
       } else {
         connections.insert(connection);
@@ -896,17 +896,17 @@ void PoseGraph3D::TrimNode(const NodeId& node_id) {
     ++constraint_it;
   }
 
-  data_.trajectory_nodes.Trim(node_id);
+  trajectory_nodes_.Trim(node_id);
   optimization_problem_->TrimTrajectoryNode(node_id);
   for (const SubmapId& submap_id : submap_ids) {
-    data_.submap_data.Trim(submap_id);
+    submap_data_.Trim(submap_id);
     constraint_builder_.DeleteScanMatcher(submap_id);
     optimization_problem_->TrimSubmap(submap_id);
   }
 
-  for (const Constraint& constraint : data_.constraints) {
-    CHECK(data_.trajectory_nodes.Contains(constraint.node_id));
-    CHECK(data_.global_submap_poses_3d.Contains(constraint.submap_id));
+  for (const Constraint& constraint : constraints_) {
+    CHECK(trajectory_nodes_.Contains(constraint.node_id));
+    CHECK(global_submap_poses_3d_.Contains(constraint.submap_id));
   }
 }
 
@@ -960,7 +960,7 @@ void PoseGraph3D::TrimPureLocalizationTrajectories() {
 void PoseGraph3D::TrimScheduledNodes() {
   absl::MutexLock locker(&mutex_);
   for (const NodeId& node_to_trim : nodes_scheduled_to_trim_) {
-    if (!data_.trajectory_nodes.Contains(node_to_trim)) {
+    if (!trajectory_nodes_.Contains(node_to_trim)) {
       continue;
     }
 
@@ -969,8 +969,8 @@ void PoseGraph3D::TrimScheduledNodes() {
     }
 
     bool submaps_for_node_are_not_finished = false;
-    for (const SubmapId& submap_id : data_.trajectory_nodes.at(node_to_trim).submap_ids) {
-      if (data_.submap_data.at(submap_id).state == SubmapState::kNoConstraintSearch) {
+    for (const SubmapId& submap_id : trajectory_nodes_.at(node_to_trim).submap_ids) {
+      if (submap_data_.at(submap_id).state == SubmapState::kNoConstraintSearch) {
         submaps_for_node_are_not_finished = true;
         break;
       }
@@ -998,9 +998,9 @@ void PoseGraph3D::HandleWorkQueue(
         info << "Global. ";
       }
       absl::MutexLock locker(&mutex_);
-      CHECK(data_.trajectory_nodes.at(constraint.node_id).submap_ids.size());
+      CHECK(trajectory_nodes_.at(constraint.node_id).submap_ids.size());
       SubmapId submap_id_for_node(
-          data_.trajectory_nodes.at(constraint.node_id).submap_ids.back());
+          trajectory_nodes_.at(constraint.node_id).submap_ids.back());
       info << "Node from " << submap_id_for_node <<
           ", submap " << constraint.submap_id <<
           ", score " << std::setprecision(3) << constraint.score;
@@ -1011,10 +1011,10 @@ void PoseGraph3D::HandleWorkQueue(
   constraints::ConstraintBuilder3D::Result true_detected_loops;
   {
     absl::MutexLock locker(&mutex_);
-    loops_trimmer_.TrimCloseLoops(data_.constraints);
+    loops_trimmer_.TrimCloseLoops(constraints_);
     true_detected_loops = loops_trimmer_.TrimFalseDetectedLoops(result,
-        data_.global_submap_poses_3d, data_.trajectory_nodes);
-    data_.constraints.insert(data_.constraints.end(),
+        global_submap_poses_3d_, trajectory_nodes_);
+    constraints_.insert(constraints_.end(),
         true_detected_loops.begin(), true_detected_loops.end());
     loops_trimmer_.AddLoops(true_detected_loops);
     DeleteTrajectoriesIfNeeded();
@@ -1040,7 +1040,7 @@ void PoseGraph3D::HandleWorkQueue(
     // Update the gauges that count the current number of constraints.
     double inter_constraints_same_trajectory = 0;
     double inter_constraints_different_trajectory = 0;
-    for (const auto& constraint : data_.constraints) {
+    for (const auto& constraint : constraints_) {
       if (constraint.tag ==
           cartographer::mapping::Constraint::INTRA_SUBMAP) {
         continue;
@@ -1172,11 +1172,11 @@ void PoseGraph3D::RunOptimization() {
   }
 
   // No other thread is accessing the optimization_problem_, constraints_,
-  // data_.frozen_trajectories and data_.landmark_nodes when executing the
+  // frozen_trajectories_ and landmark_nodes_ when executing the
   // Solve. Solve is time consuming, so not taking the mutex before Solve to
   // avoid blocking foreground processing.
-  optimization_problem_->Solve(data_.constraints, GetTrajectoryStates(),
-                               data_.landmark_nodes);
+  optimization_problem_->Solve(constraints_, GetTrajectoryStates(),
+                               landmark_nodes_);
 
 
   absl::MutexLock locker(&mutex_);
@@ -1184,7 +1184,7 @@ void PoseGraph3D::RunOptimization() {
   const auto& node_data = optimization_problem_->node_data();
   for (const int trajectory_id : node_data.trajectory_ids()) {
     for (const auto& node : node_data.trajectory(trajectory_id)) {
-      data_.trajectory_nodes.at(node.id).global_pose = node.data.global_pose;
+      trajectory_nodes_.at(node.id).global_pose = node.data.global_pose;
     }
 
     // Extrapolate all point cloud poses that were not included in the
@@ -1192,25 +1192,25 @@ void PoseGraph3D::RunOptimization() {
     const auto local_to_new_global =
         ComputeLocalToGlobalTransform(submap_data, trajectory_id);
     const auto local_to_old_global = ComputeLocalToGlobalTransform(
-        data_.global_submap_poses_3d, trajectory_id);
+        global_submap_poses_3d_, trajectory_id);
     const transform::Rigid3d old_global_to_new_global =
         local_to_new_global * local_to_old_global.inverse();
 
     const NodeId last_optimized_node_id =
         std::prev(node_data.EndOfTrajectory(trajectory_id))->id;
     auto node_it =
-        std::next(data_.trajectory_nodes.find(last_optimized_node_id));
-    for (; node_it != data_.trajectory_nodes.EndOfTrajectory(trajectory_id);
+        std::next(trajectory_nodes_.find(last_optimized_node_id));
+    for (; node_it != trajectory_nodes_.EndOfTrajectory(trajectory_id);
          ++node_it) {
-      auto& mutable_trajectory_node = data_.trajectory_nodes.at(node_it->id);
+      auto& mutable_trajectory_node = trajectory_nodes_.at(node_it->id);
       mutable_trajectory_node.global_pose =
           old_global_to_new_global * mutable_trajectory_node.global_pose;
     }
   }
   for (const auto& landmark : optimization_problem_->landmark_data()) {
-    data_.landmark_nodes[landmark.first].global_landmark_pose = landmark.second;
+    landmark_nodes_[landmark.first].global_landmark_pose = landmark.second;
   }
-  data_.global_submap_poses_3d = submap_data;
+  global_submap_poses_3d_ = submap_data;
 
   // Log the histograms for the pose residuals.
   if (options_.log_residual_histograms()) {
@@ -1225,9 +1225,9 @@ void PoseGraph3D::ScheduleFalseConstraintsTrimming(
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    loops_trimmer_.TrimFalseLoops(data_.constraints,
+    loops_trimmer_.TrimFalseLoops(constraints_,
         max_rotation_error, max_translation_error,
-        data_.global_submap_poses_3d, data_.trajectory_nodes);
+        global_submap_poses_3d_, trajectory_nodes_);
     return WorkItem::Result::kDoNotRunOptimization;
   });
 }
@@ -1259,7 +1259,7 @@ void PoseGraph3D::WaitForAllComputations() {
   int num_trajectory_nodes;
   {
     absl::MutexLock locker(&mutex_);
-    num_trajectory_nodes = data_.num_trajectory_nodes;
+    num_trajectory_nodes = num_trajectory_nodes_;
   }
 
   const int num_finished_nodes_at_start =
@@ -1301,7 +1301,7 @@ void PoseGraph3D::WaitForAllComputations() {
       [this,
        &notification](const constraints::ConstraintBuilder3D::Result& result) {
             absl::MutexLock locker(&mutex_);
-            data_.constraints.insert(data_.constraints.end(),
+            constraints_.insert(constraints_.end(),
                 result.begin(), result.end());
             loops_trimmer_.AddLoops(result);
             notification = true;
@@ -1360,8 +1360,8 @@ void PoseGraph3D::FinishTrajectory(int trajectory_id) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
     trajectory_states_.FinishTrajectory(trajectory_id);
-    for (const auto& submap : data_.submap_data.trajectory(trajectory_id)) {
-      data_.submap_data.at(submap.id).state = SubmapState::kFinished;
+    for (const auto& submap : submap_data_.trajectory(trajectory_id)) {
+      submap_data_.at(submap.id).state = SubmapState::kFinished;
     }
     return WorkItem::Result::kRunOptimization;
   });
@@ -1409,7 +1409,7 @@ void PoseGraph3D::ScheduleNodesToTrim(const std::set<common::Time>& nodes_to_tri
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    for (const auto& node : data_.trajectory_nodes) {
+    for (const auto& node : trajectory_nodes_) {
       if (nodes_to_trim.count(node.data.constant_data->time)) {
         nodes_scheduled_to_trim_.insert(node.id);
       }
@@ -1452,10 +1452,10 @@ void PoseGraph3D::AddSubmapFromProto(
     if (!maps_.ContainsTrajectory(submap_id.trajectory_id)) {
       maps_.AddTrajectory("default", submap_id.trajectory_id);
     }
-    data_.submap_data.Insert(submap_id, InternalSubmapData());
-    data_.submap_data.at(submap_id).submap = submap_ptr;
+    submap_data_.Insert(submap_id, InternalSubmapData());
+    submap_data_.at(submap_id).submap = submap_ptr;
     // Immediately show the submap at the 'global_submap_pose'.
-    data_.global_submap_poses_3d.Insert(
+    global_submap_poses_3d_.Insert(
         submap_id, optimization::SubmapSpec3D{global_submap_pose});
     // TODO(MichaelGrupp): MapBuilder does freezing before deserializing submaps,
     // so this should be fine.
@@ -1471,7 +1471,7 @@ void PoseGraph3D::AddSubmapFromProto(
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    data_.submap_data.at(submap_id).state = SubmapState::kFinished;
+    submap_data_.at(submap_id).state = SubmapState::kFinished;
     optimization_problem_->InsertSubmap(submap_id, global_submap_pose);
     return WorkItem::Result::kDoNotRunOptimization;
   });
@@ -1493,9 +1493,9 @@ void PoseGraph3D::AddNodeFromProto(
     if (!maps_.ContainsTrajectory(node_id.trajectory_id)) {
       maps_.AddTrajectory("default", node_id.trajectory_id);
     }
-    data_.trajectory_nodes.Insert(node_id,
+    trajectory_nodes_.Insert(node_id,
         TrajectoryNode{constant_data, global_pose});
-    data_.trajectory_nodes.at(node_id).submap_ids.reserve(2);
+    trajectory_nodes_.at(node_id).submap_ids.reserve(2);
     loops_trimmer_.AddNode(node_id, constant_data->accum_rotation, constant_data->travelled_distance);
   }
 
@@ -1505,7 +1505,7 @@ void PoseGraph3D::AddNodeFromProto(
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
     const auto& constant_data =
-        data_.trajectory_nodes.at(node_id).constant_data;
+        trajectory_nodes_.at(node_id).constant_data;
     optimization_problem_->InsertTrajectoryNode(
         node_id,
         optimization::NodeSpec3D{
@@ -1546,8 +1546,8 @@ void PoseGraph3D::SetLandmarkPose(
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    data_.landmark_nodes[landmark_id].global_landmark_pose = global_pose;
-    data_.landmark_nodes[landmark_id].frozen = frozen;
+    landmark_nodes_[landmark_id].global_landmark_pose = global_pose;
+    landmark_nodes_[landmark_id].frozen = frozen;
     return WorkItem::Result::kDoNotRunOptimization;
   });
 }
@@ -1560,19 +1560,19 @@ void PoseGraph3D::AddSerializedConstraints(
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
     for (const Constraint& constraint : constraints) {
-      CHECK(data_.trajectory_nodes.Contains(constraint.node_id));
-      CHECK(data_.submap_data.Contains(constraint.submap_id));
-      CHECK(data_.trajectory_nodes.at(constraint.node_id).constant_data !=
+      CHECK(trajectory_nodes_.Contains(constraint.node_id));
+      CHECK(submap_data_.Contains(constraint.submap_id));
+      CHECK(trajectory_nodes_.at(constraint.node_id).constant_data !=
             nullptr);
-      CHECK(data_.submap_data.at(constraint.submap_id).submap != nullptr);
+      CHECK(submap_data_.at(constraint.submap_id).submap != nullptr);
       switch (constraint.tag) {
         case Constraint::Tag::INTRA_SUBMAP:
           {
-            bool emplaced = data_.submap_data.at(constraint.submap_id)
+            bool emplaced = submap_data_.at(constraint.submap_id)
                 .node_ids.emplace(constraint.node_id).second;
             CHECK(emplaced);
             std::vector<SubmapId>& submap_ids_for_node =
-                data_.trajectory_nodes.at(constraint.node_id).submap_ids;
+                trajectory_nodes_.at(constraint.node_id).submap_ids;
             submap_ids_for_node.emplace_back(constraint.submap_id);
             std::sort(submap_ids_for_node.begin(), submap_ids_for_node.end());
           }
@@ -1581,13 +1581,13 @@ void PoseGraph3D::AddSerializedConstraints(
           UpdateTrajectoryConnectivity(constraint);
           break;
       }
-      data_.constraints.push_back(constraint);
+      constraints_.push_back(constraint);
     }
-    for (const auto& [submap_id, submap_data] : data_.submap_data) {
+    for (const auto& [submap_id, submap_data] : submap_data_) {
       CHECK(submap_data.node_ids.size());
       loops_trimmer_.AddSubmap(submap_id, *submap_data.node_ids.begin());
     }
-    for (const Constraint& constraint : data_.constraints) {
+    for (const Constraint& constraint : constraints_) {
       if (constraint.tag == Constraint::INTER_SUBMAP) {
         loops_trimmer_.AddLoop(constraint);
       }
@@ -1637,20 +1637,20 @@ void PoseGraph3D::SetInitialTrajectoryPose(
     int from_trajectory_id, int to_trajectory_id,
     const transform::Rigid3d& pose, common::Time time) {
   absl::MutexLock locker(&mutex_);
-  data_.initial_trajectory_poses[from_trajectory_id] =
+  initial_trajectory_poses_[from_trajectory_id] =
       InitialTrajectoryPose{to_trajectory_id, pose, time};
 }
 
 transform::Rigid3d PoseGraph3D::GetInterpolatedGlobalTrajectoryPose(
     int trajectory_id, const common::Time time) const {
-  CHECK_GT(data_.trajectory_nodes.SizeOfTrajectoryOrZero(trajectory_id), 0);
-  const auto it = data_.trajectory_nodes.lower_bound(trajectory_id, time);
-  if (it == data_.trajectory_nodes.BeginOfTrajectory(trajectory_id)) {
-    return data_.trajectory_nodes.BeginOfTrajectory(trajectory_id)
+  CHECK_GT(trajectory_nodes_.SizeOfTrajectoryOrZero(trajectory_id), 0);
+  const auto it = trajectory_nodes_.lower_bound(trajectory_id, time);
+  if (it == trajectory_nodes_.BeginOfTrajectory(trajectory_id)) {
+    return trajectory_nodes_.BeginOfTrajectory(trajectory_id)
         ->data.global_pose;
   }
-  if (it == data_.trajectory_nodes.EndOfTrajectory(trajectory_id)) {
-    return std::prev(data_.trajectory_nodes.EndOfTrajectory(trajectory_id))
+  if (it == trajectory_nodes_.EndOfTrajectory(trajectory_id)) {
+    return std::prev(trajectory_nodes_.EndOfTrajectory(trajectory_id))
         ->data.global_pose;
   }
   return transform::Interpolate(
@@ -1668,8 +1668,8 @@ transform::Rigid3d PoseGraph3D::ComputeLocalToGlobalTransform(
   auto begin_it = global_submap_poses.BeginOfTrajectory(trajectory_id);
   auto end_it = global_submap_poses.EndOfTrajectory(trajectory_id);
   if (begin_it == end_it) {
-    const auto it = data_.initial_trajectory_poses.find(trajectory_id);
-    if (it != data_.initial_trajectory_poses.end()) {
+    const auto it = initial_trajectory_poses_.find(trajectory_id);
+    if (it != initial_trajectory_poses_.end()) {
       return GetInterpolatedGlobalTrajectoryPose(it->second.to_trajectory_id,
                                                  it->second.time) *
              it->second.relative_pose;
@@ -1680,7 +1680,7 @@ transform::Rigid3d PoseGraph3D::ComputeLocalToGlobalTransform(
   const SubmapId last_optimized_submap_id = std::prev(end_it)->id;
   // Accessing 'local_pose' in Submap is okay, since the member is const.
   return global_submap_poses.at(last_optimized_submap_id).global_pose *
-         data_.submap_data.at(last_optimized_submap_id)
+         submap_data_.at(last_optimized_submap_id)
              .submap->local_pose()
              .inverse();
 }
@@ -1711,7 +1711,7 @@ bool PoseGraph3D::TrajectoriesBelongToTheSameMap(
 transform::Rigid3d PoseGraph3D::GetLocalToGlobalTransform(
     int trajectory_id) const {
   absl::MutexLock locker(&mutex_);
-  return ComputeLocalToGlobalTransform(data_.global_submap_poses_3d, trajectory_id);
+  return ComputeLocalToGlobalTransform(global_submap_poses_3d_, trajectory_id);
 }
 
 void PoseGraph3D::MoveTrajectoryToMap(int trajectory_id, const std::string& map_name) {
@@ -1720,7 +1720,7 @@ void PoseGraph3D::MoveTrajectoryToMap(int trajectory_id, const std::string& map_
         ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_) {
     absl::MutexLock queue_locker(&executing_work_item_mutex_);
     absl::MutexLock locker(&mutex_);
-    if (data_.trajectory_nodes.SizeOfTrajectoryOrZero(trajectory_id) &&
+    if (trajectory_nodes_.SizeOfTrajectoryOrZero(trajectory_id) &&
         maps_.GetMapName(trajectory_id) != "default") {
     }
     maps_.MoveTrajectory(trajectory_id, map_name);
@@ -1744,7 +1744,7 @@ MapById<SubmapId, PoseGraphInterface::SubmapPose>
 PoseGraph3D::GetAllSubmapPoses() const {
   absl::MutexLock locker(&mutex_);
   MapById<SubmapId, SubmapPose> submap_poses;
-  for (const auto& submap_id_data : data_.submap_data) {
+  for (const auto& submap_id_data : submap_data_) {
     auto submap_data = GetSubmapDataUnderLock(submap_id_data.id);
     submap_poses.Insert(
         submap_id_data.id,
@@ -1756,26 +1756,26 @@ PoseGraph3D::GetAllSubmapPoses() const {
 
 PoseGraphInterface::SubmapData PoseGraph3D::GetSubmapDataUnderLock(
     const SubmapId& submap_id) const {
-  const auto it = data_.submap_data.find(submap_id);
-  if (it == data_.submap_data.end()) {
+  const auto it = submap_data_.find(submap_id);
+  if (it == submap_data_.end()) {
     return {};
   }
   auto submap = it->data.submap;
-  if (data_.global_submap_poses_3d.Contains(submap_id)) {
+  if (global_submap_poses_3d_.Contains(submap_id)) {
     // We already have an optimized pose.
-    return {submap, data_.global_submap_poses_3d.at(submap_id).global_pose};
+    return {submap, global_submap_poses_3d_.at(submap_id).global_pose};
   }
   // We have to extrapolate.
   return {submap,
       ComputeLocalToGlobalTransform(
-          data_.global_submap_poses_3d,
+          global_submap_poses_3d_,
           submap_id.trajectory_id) * submap->local_pose()};
 }
 
 MapById<SubmapId, PoseGraphInterface::SubmapData>
 PoseGraph3D::GetSubmapDataUnderLock() const {
   MapById<SubmapId, PoseGraphInterface::SubmapData> submaps;
-  for (const auto& submap_id_data : data_.submap_data) {
+  for (const auto& submap_id_data : submap_data_) {
     submaps.Insert(
         submap_id_data.id,
         GetSubmapDataUnderLock(submap_id_data.id));
@@ -1785,13 +1785,13 @@ PoseGraph3D::GetSubmapDataUnderLock() const {
 
 MapById<NodeId, TrajectoryNode> PoseGraph3D::GetTrajectoryNodes() const {
   absl::MutexLock locker(&mutex_);
-  return data_.trajectory_nodes;
+  return trajectory_nodes_;
 }
 
 MapById<NodeId, TrajectoryNodePose> PoseGraph3D::GetTrajectoryNodePoses() const {
   MapById<NodeId, TrajectoryNodePose> node_poses;
   absl::MutexLock locker(&mutex_);
-  for (const auto& node_id_data : data_.trajectory_nodes) {
+  for (const auto& node_id_data : trajectory_nodes_) {
     absl::optional<TrajectoryNodePose::ConstantPoseData> constant_pose_data;
     if (node_id_data.data.constant_data != nullptr) {
       constant_pose_data = TrajectoryNodePose::ConstantPoseData{
@@ -1817,7 +1817,7 @@ std::map<int, TrajectoryState> PoseGraph3D::GetTrajectoryStates() const {
 std::map<std::string, transform::Rigid3d> PoseGraph3D::GetLandmarkPoses() const {
   std::map<std::string, transform::Rigid3d> landmark_poses;
   absl::MutexLock locker(&mutex_);
-  for (const auto& landmark : data_.landmark_nodes) {
+  for (const auto& landmark : landmark_nodes_) {
     // Landmark without value has not been optimized yet.
     if (!landmark.second.global_landmark_pose.has_value()) continue;
     landmark_poses[landmark.first] =
@@ -1845,7 +1845,7 @@ PoseGraph3D::GetFixedFramePoseData() const {
 std::map<std::string, PoseGraphInterface::LandmarkNode>
 PoseGraph3D::GetLandmarkNodes() const {
   absl::MutexLock locker(&mutex_);
-  return data_.landmark_nodes;
+  return landmark_nodes_;
 }
 
 std::map<int, PoseGraphInterface::TrajectoryData>
@@ -1861,7 +1861,7 @@ std::map<std::string, std::set<int>> PoseGraph3D::GetMapsData() const {
 
 std::vector<Constraint> PoseGraph3D::constraints() const {
   absl::MutexLock locker(&mutex_);
-  return data_.constraints;
+  return constraints_;
 }
 
 void PoseGraph3D::SetGlobalSlamOptimizationCallback(
@@ -1877,14 +1877,14 @@ void PoseGraph3D::SetGlobalSlamOptimizationCallback(
 void PoseGraph3D::LogResidualHistograms() const {
   common::Histogram rotational_residual;
   common::Histogram translational_residual;
-  for (const Constraint& constraint : data_.constraints) {
+  for (const Constraint& constraint : constraints_) {
     if (constraint.tag == Constraint::Tag::INTRA_SUBMAP) {
       const cartographer::transform::Rigid3d optimized_node_to_map =
-          data_.trajectory_nodes.at(constraint.node_id).global_pose;
+          trajectory_nodes_.at(constraint.node_id).global_pose;
       const cartographer::transform::Rigid3d node_to_submap_constraint =
           constraint.pose.zbar_ij;
       const cartographer::transform::Rigid3d optimized_submap_to_map =
-          data_.global_submap_poses_3d.at(constraint.submap_id).global_pose;
+          global_submap_poses_3d_.at(constraint.submap_id).global_pose;
       const cartographer::transform::Rigid3d optimized_node_to_submap =
           optimized_submap_to_map.inverse() * optimized_node_to_map;
       const cartographer::transform::Rigid3d residual =
