@@ -63,7 +63,7 @@ void LoopsTrimmer::RemoveLoop(const SubmapId& submap, const NodeId& node) {
 
 std::vector<Constraint> LoopsTrimmer::TrimFalseDetectedLoops(
     const std::vector<Constraint>& new_loops,
-    const MapById<SubmapId, optimization::SubmapSpec3D>& global_submap_poses_3d,
+    const MapById<SubmapId, InternalSubmapData>& global_submap_poses_3d,
     const MapById<NodeId, TrajectoryNode>& trajectory_nodes) const {
   MEASURE_BLOCK_TIME(LoopsTrimmer__TrimFalseDetectedLoops);
 
@@ -182,7 +182,7 @@ std::pair<double, double> LoopsTrimmer::GetARTDWithLoops(
 
 std::pair<double, double> LoopsTrimmer::GetLoopError(
     const Constraint& loop,
-    const MapById<SubmapId, optimization::SubmapSpec3D>& global_submap_poses_3d,
+    const MapById<SubmapId, InternalSubmapData>& global_submap_poses_3d,
     const MapById<NodeId, TrajectoryNode>& trajectory_nodes) const {
   const transform::Rigid3d& global_submap_pose =
       global_submap_poses_3d.at(loop.submap_id).global_pose;
@@ -278,7 +278,7 @@ void LoopsTrimmer::TrimCloseLoops(std::vector<Constraint>& constraints) {
 void LoopsTrimmer::TrimFalseLoops(
     std::vector<Constraint>& constraints,
     double max_rotation_error, double max_translation_error,
-    const MapById<SubmapId, optimization::SubmapSpec3D>& global_submap_poses_3d,
+    const MapById<SubmapId, InternalSubmapData>& global_submap_poses_3d,
     const MapById<NodeId, TrajectoryNode>& trajectory_nodes) {
   for (auto constraint_it = constraints.begin(); constraint_it != constraints.end();) {
     const Constraint& constraint = *constraint_it;

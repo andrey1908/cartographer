@@ -52,14 +52,6 @@
 namespace cartographer {
 namespace mapping {
 
-enum class SubmapState { kNoConstraintSearch, kFinished };
-
-struct InternalSubmapData {
-  std::shared_ptr<const Submap> submap;
-  SubmapState state = SubmapState::kNoConstraintSearch;
-  std::set<NodeId> node_ids;
-};
-
 class PoseGraph3D : public PoseGraph {
 public:
   PoseGraph3D(
@@ -72,11 +64,9 @@ public:
   PoseGraph3D& operator=(const PoseGraph3D&) = delete;
 
   NodeId AddNode(
-      std::shared_ptr<const TrajectoryNode::Data> constant_data,
-      int trajectory_id,
+      std::shared_ptr<const TrajectoryNode::Data> constant_data, int trajectory_id,
       const std::vector<std::shared_ptr<const Submap3D>>& insertion_submaps)
-          ABSL_LOCKS_EXCLUDED(mutex_)
-          ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
+          ABSL_LOCKS_EXCLUDED(mutex_);
 
   void AddImuData(
       int trajectory_id,
@@ -166,7 +156,7 @@ public:
       int trajectory_a, int trajectory_b) const override
           ABSL_LOCKS_EXCLUDED(mutex_);
 
-  transform::Rigid3d GetLocalToGlobalTransform(int trajectory_id) const
+  transform::Rigid3d GetGlobalToLocalTransform(int trajectory_id) const
       ABSL_LOCKS_EXCLUDED(mutex_);
 
   void MoveTrajectoryToMap(int trajectory_id, const std::string& map_name) override
@@ -208,7 +198,7 @@ public:
 
   void SetGlobalSlamOptimizationCallback(
       PoseGraphInterface::GlobalSlamOptimizationCallback callback) override
-          ABSL_LOCKS_EXCLUDED(mutex_);
+          ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
 
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
 
@@ -223,117 +213,102 @@ private:
   void AddWorkItem(const std::function<WorkItem::Result()>& work_item)
       ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
   void HandleWorkQueue(const constraints::ConstraintBuilder3D::Result& result)
-      ABSL_LOCKS_EXCLUDED(mutex_)
-      ABSL_LOCKS_EXCLUDED(work_queue_mutex_)
-      ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_);
+      ABSL_LOCKS_EXCLUDED(mutex_);
   void DrainWorkQueue()
-      ABSL_LOCKS_EXCLUDED(mutex_)
-      ABSL_LOCKS_EXCLUDED(work_queue_mutex_)
-      ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_);
+      ABSL_LOCKS_EXCLUDED(work_queue_mutex_);
 
   void RunOptimization()
-      ABSL_LOCKS_EXCLUDED(mutex_)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+      ABSL_LOCKS_EXCLUDED(mutex_);
 
   void TrimSubmap(const SubmapId& submap_id)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void ReattachLoop(Constraint& loop, const NodeId& to_node_id)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void ReattachLoop(Constraint& loop, const SubmapId& to_submap_id)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void TrimNode(const NodeId& node_id)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   void TrimPureLocalizationTrajectories()
-      ABSL_LOCKS_EXCLUDED(mutex_)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void TrimScheduledNodes()
-      ABSL_LOCKS_EXCLUDED(mutex_)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   std::pair<bool, bool> CheckIfConstraintCanBeAdded(
       const NodeId& node_id, const SubmapId& submap_id)
-          ABSL_LOCKS_EXCLUDED(mutex_)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+          ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   std::pair<std::vector<SubmapId>, std::vector<SubmapId>>
-      ComputeCandidatesForConstraints(const NodeId& node_id)
-          ABSL_LOCKS_EXCLUDED(mutex_)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+      ComputeCandidatesForConstraints(const NodeId& node_id,
+          const std::map<int, SubmapId>& last_connected_submap_ids)
+              ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   std::pair<std::vector<NodeId>, std::vector<NodeId>>
-      ComputeCandidatesForConstraints(const SubmapId& submap_id)
-          ABSL_LOCKS_EXCLUDED(mutex_)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+      ComputeCandidatesForConstraints(const SubmapId& submap_id,
+          const std::map<int, NodeId>& last_connected_node_ids)
+              ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   static std::vector<SubmapId>
       SelectCandidatesForConstraints(
           const std::vector<SubmapId>& candidates,
           double& num_constraints_to_compute,
-          std::set<SubmapId>& submaps_used_for_constraints)
-              ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+          std::set<SubmapId>& submaps_used_for_constraints);
   std::pair<std::vector<SubmapId>, std::vector<SubmapId>>
       SelectCandidatesForConstraints(
           const std::vector<SubmapId>& local_candidates,
           const std::vector<SubmapId>& global_candidates)
-              ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+              ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   static std::vector<NodeId>
       SelectCandidatesForConstraints(
           const std::vector<NodeId>& candidates,
-          double& num_constraints_to_compute)
-              ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+          double& num_constraints_to_compute);
   std::pair<std::vector<NodeId>, std::vector<NodeId>>
       SelectCandidatesForConstraints(
           const std::vector<NodeId>& local_candidates,
           const std::vector<NodeId>& global_candidates)
-              ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+              ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   void MaybeAddConstraints(const NodeId& node_id,
       const std::vector<SubmapId>& local_submap_ids,
       const std::vector<SubmapId>& global_submap_ids)
-          ABSL_LOCKS_EXCLUDED(mutex_)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+          ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void MaybeAddConstraints(const SubmapId& submap_id,
       const std::vector<NodeId>& local_node_ids,
       const std::vector<NodeId>& global_node_ids)
-          ABSL_LOCKS_EXCLUDED(mutex_)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+          ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  std::vector<SubmapId> InitializeGlobalSubmapPoses(
-      int trajectory_id, const common::Time time,
-      const std::vector<std::shared_ptr<const Submap3D>>& insertion_submaps)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
-
+  void ConnectNodeToGraph(
+      const NodeId& node_id,
+      const std::vector<SubmapId>& submap_ids,
+      bool new_submap_added,
+      bool old_submap_finished)
+          ABSL_LOCKS_EXCLUDED(mutex_);
   WorkItem::Result ComputeConstraintsForNode(
       const NodeId& node_id,
-      std::vector<std::shared_ptr<const Submap3D>> insertion_submaps,
-      bool newly_finished_submap)
-          ABSL_LOCKS_EXCLUDED(mutex_)
-          ABSL_LOCKS_EXCLUDED(executing_work_item_mutex_);
+      const std::vector<SubmapId>& submap_ids,
+      bool old_submap_finished)
+          ABSL_LOCKS_EXCLUDED(mutex_);
 
-  NodeId AppendNode(
+  std::tuple<NodeId, std::vector<SubmapId>, bool> AppendNode(
       std::shared_ptr<const TrajectoryNode::Data> constant_data,
       int trajectory_id,
-      const std::vector<std::shared_ptr<const Submap3D>>& insertion_submaps,
-      const transform::Rigid3d& optimized_pose)
+      const std::vector<std::shared_ptr<const Submap3D>>& insertion_submaps)
           ABSL_LOCKS_EXCLUDED(mutex_);
 
   transform::Rigid3d GetInterpolatedGlobalTrajectoryPose(
       int trajectory_id, const common::Time time) const
           ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  transform::Rigid3d ComputeLocalToGlobalTransform(
-      const MapById<SubmapId, optimization::SubmapSpec3D>& global_submap_poses,
+  transform::Rigid3d ComputeGlobalToLocalTransform(
+      const MapById<SubmapId, InternalSubmapData>& global_submap_poses,
+      int trajectory_id) const
+          ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  transform::Rigid3d ComputeGlobalToLocalTransform(
+      const MapById<SubmapId, transform::Rigid3d>& global_submap_poses,
       int trajectory_id) const
           ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   void DeleteTrajectoriesIfNeeded()
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   PoseGraph::SubmapData GetSubmapDataUnderLock(const SubmapId& submap_id) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
@@ -342,21 +317,17 @@ private:
 
   common::Time GetLatestNodeTime(
       const NodeId& node_id, const SubmapId& submap_id) const
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
-          ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
-  
+          ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void UpdateTrajectoryConnectivity(const Constraint& constraint)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   void LogResidualHistograms() const
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executing_work_item_mutex_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
 private:
   mutable absl::Mutex mutex_;
+  absl::Mutex callback_mutex_;
   absl::Mutex work_queue_mutex_;
-  absl::Mutex executing_work_item_mutex_;  // this mutex is used only for annotations
 
   const proto::PoseGraphOptions options_;
   std::unique_ptr<optimization::OptimizationProblem3D> optimization_problem_;
@@ -365,36 +336,35 @@ private:
 
   std::unique_ptr<WorkQueue> work_queue_ ABSL_GUARDED_BY(work_queue_mutex_);
 
-  int num_nodes_since_last_loop_closure_ ABSL_GUARDED_BY(executing_work_item_mutex_);
+  int num_nodes_since_last_loop_closure_ ABSL_GUARDED_BY(mutex_);
 
-  std::map<int, proto::PureLocalizationTrimmerOptions> pure_localization_trimmer_options_
-      ABSL_GUARDED_BY(executing_work_item_mutex_);
-  std::set<int> pure_localization_trajectory_ids_
-      ABSL_GUARDED_BY(executing_work_item_mutex_);
+  std::map<int, proto::PureLocalizationTrimmerOptions> pure_localization_trimmer_options_ ABSL_GUARDED_BY(mutex_);
+  std::set<int> pure_localization_trajectory_ids_ ABSL_GUARDED_BY(mutex_);
 
-  double num_local_constraints_to_compute_ ABSL_GUARDED_BY(executing_work_item_mutex_);
-  double num_global_constraints_to_compute_ ABSL_GUARDED_BY(executing_work_item_mutex_);
-  std::set<SubmapId> submaps_used_for_local_constraints_
-      ABSL_GUARDED_BY(executing_work_item_mutex_);
-  std::set<SubmapId> submaps_used_for_global_constraints_
-      ABSL_GUARDED_BY(executing_work_item_mutex_);
+  double num_local_constraints_to_compute_ ABSL_GUARDED_BY(mutex_);
+  double num_global_constraints_to_compute_ ABSL_GUARDED_BY(mutex_);
+  std::set<SubmapId> submaps_used_for_local_constraints_ ABSL_GUARDED_BY(mutex_);
+  std::set<SubmapId> submaps_used_for_global_constraints_ ABSL_GUARDED_BY(mutex_);
 
-  std::set<NodeId> nodes_scheduled_to_trim_ ABSL_GUARDED_BY(executing_work_item_mutex_);
+  std::set<NodeId> nodes_scheduled_to_trim_ ABSL_GUARDED_BY(mutex_);
 
   MapById<SubmapId, InternalSubmapData> submap_data_ ABSL_GUARDED_BY(mutex_);
-  MapById<SubmapId, optimization::SubmapSpec3D> global_submap_poses_3d_ ABSL_GUARDED_BY(mutex_);
   MapById<NodeId, TrajectoryNode> trajectory_nodes_ ABSL_GUARDED_BY(mutex_);
-  std::map<std::string, PoseGraphInterface::LandmarkNode> landmark_nodes_ ABSL_GUARDED_BY(mutex_);
   int num_trajectory_nodes_ = 0 ABSL_GUARDED_BY(mutex_);
+  std::map<std::string, PoseGraphInterface::LandmarkNode> landmark_nodes_ ABSL_GUARDED_BY(mutex_);
   std::map<int, PoseGraph::InitialTrajectoryPose> initial_trajectory_poses_ ABSL_GUARDED_BY(mutex_);
   std::vector<Constraint> constraints_ ABSL_GUARDED_BY(mutex_);
   PoseGraphTrajectoryStates trajectory_states_ ABSL_GUARDED_BY(mutex_);
   PoseGraphMaps maps_ ABSL_GUARDED_BY(mutex_);
 
+  sensor::MapByTime<sensor::ImuData> imu_data_ ABSL_GUARDED_BY(mutex_);
+  sensor::MapByTime<sensor::OdometryData> odometry_data_ ABSL_GUARDED_BY(mutex_);
+  sensor::MapByTime<sensor::FixedFramePoseData> fixed_frame_pose_data_ ABSL_GUARDED_BY(mutex_);
+  std::map<int, PoseGraphInterface::TrajectoryData> trajectory_data_ ABSL_GUARDED_BY(mutex_);
+
   LoopsTrimmer loops_trimmer_ ABSL_GUARDED_BY(mutex_);
 
-  GlobalSlamOptimizationCallback global_slam_optimization_callback_
-      ABSL_GUARDED_BY(executing_work_item_mutex_);
+  GlobalSlamOptimizationCallback global_slam_optimization_callback_ ABSL_GUARDED_BY(callback_mutex_);
 };
 
 }  // namespace mapping

@@ -75,7 +75,7 @@ struct TrajectoryNode {
   // The node pose in the global SLAM frame.
   transform::Rigid3d global_pose;
 
-  std::vector<SubmapId> submap_ids;  // first - less
+  std::vector<SubmapId> submap_ids;
 };
 
 proto::TrajectoryNodeData ToProto(const TrajectoryNode::Data& constant_data);

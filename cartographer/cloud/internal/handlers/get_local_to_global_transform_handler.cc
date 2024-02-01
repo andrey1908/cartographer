@@ -33,7 +33,7 @@ void GetLocalToGlobalTransformHandler::OnRequest(
       GetContext<MapBuilderContextInterface>()
           ->map_builder()
           .pose_graph()
-          ->GetLocalToGlobalTransform(request.trajectory_id());
+          ->GetGlobalToLocalTransform(request.trajectory_id());
   *response->mutable_local_to_global() = transform::ToProto(local_to_global);
   Send(std::move(response));
 }

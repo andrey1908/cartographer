@@ -76,7 +76,7 @@ PoseGraphStub::GetAllSubmapPoses() const {
   return submap_poses;
 }
 
-transform::Rigid3d PoseGraphStub::GetLocalToGlobalTransform(
+transform::Rigid3d PoseGraphStub::GetGlobalToLocalTransform(
     int trajectory_id) const {
   proto::GetLocalToGlobalTransformRequest request;
   request.set_trajectory_id(trajectory_id);

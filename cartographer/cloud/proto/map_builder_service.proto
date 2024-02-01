@@ -316,7 +316,7 @@ service MapBuilderService {
       returns (GetAllSubmapPosesResponse);
 
   // Returns the current local-to-global transform for the trajectory.
-  rpc GetLocalToGlobalTransform(GetLocalToGlobalTransformRequest)
+  rpc GetGlobalToLocalTransform(GetLocalToGlobalTransformRequest)
       returns (GetLocalToGlobalTransformResponse);
 
   // Returns the list of constraints in the current optimization problem.

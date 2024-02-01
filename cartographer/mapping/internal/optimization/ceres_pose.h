@@ -29,34 +29,21 @@ namespace mapping {
 namespace optimization {
 
 class CeresPose {
- public:
-  CeresPose(
-      const transform::Rigid3d& rigid,
-      std::unique_ptr<ceres::LocalParameterization> translation_parametrization,
-      std::unique_ptr<ceres::LocalParameterization> rotation_parametrization,
-      ceres::Problem* problem);
+public:
+  CeresPose(const transform::Rigid3d& pose);
 
-  const transform::Rigid3d ToRigid() const;
+  double* translation() { return translation_.data(); }
+  const double* translation() const { return translation_.data(); }
 
-  double* translation() { return data_->translation.data(); }
-  const double* translation() const { return data_->translation.data(); }
+  double* rotation() { return rotation_.data(); }
+  const double* rotation() const { return rotation_.data(); }
 
-  double* rotation() { return data_->rotation.data(); }
-  const double* rotation() const { return data_->rotation.data(); }
+  transform::Rigid3d ToRigid() const;
 
-  struct Data {
-    std::array<double, 3> translation;
-    // Rotation quaternion as (w, x, y, z).
-    std::array<double, 4> rotation;
-  };
-
-  Data& data() { return *data_; }
-
- private:
-  std::shared_ptr<Data> data_;
+private:
+  std::array<double, 3> translation_;
+  std::array<double, 4> rotation_;
 };
-
-CeresPose::Data FromPose(const transform::Rigid3d& pose);
 
 }  // namespace optimization
 }  // namespace mapping

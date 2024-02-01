@@ -30,14 +30,14 @@
 #include "cartographer/sensor/imu_data.h"
 #include "cartographer/sensor/map_by_time.h"
 #include "cartographer/sensor/odometry_data.h"
+#include "cartographer/mapping/internal/pose_graph_trajectory_states.h"
 
 namespace cartographer {
 namespace mapping {
 namespace optimization {
 
 // Implements the SPA loop closure method.
-template <typename NodeDataType, typename SubmapDataType,
-          typename RigidTransformType>
+template <typename RigidTransformType>
 class OptimizationProblemInterface {
  public:
   using LandmarkNode = PoseGraphInterface::LandmarkNode;
@@ -49,36 +49,28 @@ class OptimizationProblemInterface {
   OptimizationProblemInterface& operator=(const OptimizationProblemInterface&) =
       delete;
 
-  virtual void AddImuData(int trajectory_id,
-                          const sensor::ImuData& imu_data) = 0;
-  virtual void AddOdometryData(int trajectory_id,
-                               const sensor::OdometryData& odometry_data) = 0;
-  virtual void AddTrajectoryNode(int trajectory_id,
-                                 const NodeDataType& node_data) = 0;
   virtual void InsertTrajectoryNode(const NodeId& node_id,
-                                    const NodeDataType& node_data) = 0;
+      const common::Time& time, const RigidTransformType& local_pose,
+      const RigidTransformType& global_pose) = 0;
   virtual void TrimTrajectoryNode(const NodeId& node_id) = 0;
-  virtual void AddSubmap(int trajectory_id,
-                         const RigidTransformType& global_submap_pose) = 0;
   virtual void InsertSubmap(const SubmapId& submap_id,
-                            const RigidTransformType& global_submap_pose) = 0;
+      const RigidTransformType& global_pose) = 0;
   virtual void TrimSubmap(const SubmapId& submap_id) = 0;
   virtual void SetMaxNumIterations(int32 max_num_iterations) = 0;
 
-  // Optimizes the global poses.
-  virtual void Solve(
+  virtual bool BuildProblem(
       const std::vector<Constraint>& constraints,
-      const std::map<int, TrajectoryState>&
-          trajectories_state,
+      const sensor::MapByTime<sensor::ImuData>& imu_data,
+      const sensor::MapByTime<sensor::OdometryData>& odometry_data,
+      const sensor::MapByTime<sensor::FixedFramePoseData>& fixed_frame_pose_data,
+      const PoseGraphTrajectoryStates& trajectory_states,
+      const std::map<int, PoseGraphInterface::TrajectoryData>& trajectory_data,
       const std::map<std::string, LandmarkNode>& landmark_nodes) = 0;
+  virtual void Solve() = 0;
 
-  virtual const MapById<NodeId, NodeDataType>& node_data() const = 0;
-  virtual const MapById<SubmapId, SubmapDataType>& submap_data() const = 0;
-  virtual const std::map<std::string, transform::Rigid3d>& landmark_data()
-      const = 0;
-  virtual const sensor::MapByTime<sensor::ImuData>& imu_data() const = 0;
-  virtual const sensor::MapByTime<sensor::OdometryData>& odometry_data()
-      const = 0;
+  virtual MapById<SubmapId, RigidTransformType> GetSubmapPoses() const = 0;
+  virtual MapById<NodeId, RigidTransformType> GetNodePoses() const = 0;
+  virtual std::map<std::string, RigidTransformType> GetLandmarkData() const = 0;
 };
 
 }  // namespace optimization

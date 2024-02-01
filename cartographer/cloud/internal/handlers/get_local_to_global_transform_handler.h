@@ -28,7 +28,7 @@ namespace handlers {
 DEFINE_HANDLER_SIGNATURE(
     GetLocalToGlobalTransformSignature, proto::GetLocalToGlobalTransformRequest,
     proto::GetLocalToGlobalTransformResponse,
-    "/cartographer.cloud.proto.MapBuilderService/GetLocalToGlobalTransform")
+    "/cartographer.cloud.proto.MapBuilderService/GetGlobalToLocalTransform")
 
 class GetLocalToGlobalTransformHandler
     : public async_grpc::RpcHandler<GetLocalToGlobalTransformSignature> {

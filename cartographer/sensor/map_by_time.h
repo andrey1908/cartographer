@@ -63,11 +63,11 @@ class MapByTime {
     CHECK(node_it != nodes.end());
     const common::Time gap_start =
         node_it != nodes.BeginOfTrajectory(trajectory_id)
-            ? std::prev(node_it)->data.time
+            ? std::prev(node_it)->data.time()
             : common::Time::min();
     const auto next_it = std::next(node_it);
     const common::Time gap_end = next_it != nodes.EndOfTrajectory(trajectory_id)
-                                     ? next_it->data.time
+                                     ? next_it->data.time()
                                      : common::Time::max();
     CHECK_LT(gap_start, gap_end);
 

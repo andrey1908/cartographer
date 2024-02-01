@@ -34,9 +34,9 @@ using LandmarkObservation =
     PoseGraphInterface::LandmarkNode::LandmarkObservation;
 
 TEST(LandmarkCostFunction3DTest, SmokeTest) {
-  NodeSpec3D prev_node;
+  NodeData prev_node;
   prev_node.time = common::FromUniversal(0);
-  NodeSpec3D next_node;
+  NodeData next_node;
   next_node.time = common::FromUniversal(10);
 
   std::unique_ptr<ceres::CostFunction> cost_function(

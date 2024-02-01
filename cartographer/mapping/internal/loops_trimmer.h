@@ -11,6 +11,7 @@
 #include "cartographer/mapping/constraint.h"
 #include "cartographer/mapping/internal/optimization/optimization_problem_3d.h"
 #include "cartographer/mapping/trajectory_node.h"
+#include "cartographer/mapping/pose_graph.h"
 
 #include "cartographer/mapping/proto/loop_trimmer_options.pb.h"
 
@@ -33,14 +34,14 @@ public:
 
   std::vector<Constraint> TrimFalseDetectedLoops(
       const std::vector<Constraint>& new_loops,
-      const MapById<SubmapId, optimization::SubmapSpec3D>& global_submap_poses_3d,
+      const MapById<SubmapId, InternalSubmapData>& global_submap_poses_3d,
       const MapById<NodeId, TrajectoryNode>& trajectory_nodes) const;
   void TrimCloseLoops(std::vector<Constraint>& constraints);
 
   void TrimFalseLoops(
       std::vector<Constraint>& constraints,
       double max_rotation_error, double max_translation_error,
-      const MapById<SubmapId, optimization::SubmapSpec3D>& global_submap_poses_3d,
+      const MapById<SubmapId, InternalSubmapData>& global_submap_poses_3d,
       const MapById<NodeId, TrajectoryNode>& trajectory_nodes);
 
 private:
@@ -48,7 +49,7 @@ private:
       const NodeId& node_1, const NodeId& node_2, float min_score) const;
   std::pair<double, double> GetLoopError(
       const Constraint& loop,
-      const MapById<SubmapId, optimization::SubmapSpec3D>& global_submap_poses_3d,
+      const MapById<SubmapId, InternalSubmapData>& global_submap_poses_3d,
       const MapById<NodeId, TrajectoryNode>& trajectory_nodes) const;
 
 private:

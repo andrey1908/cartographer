@@ -88,7 +88,7 @@ class PoseGraphInterface {
   // Returns the transform converting data in the local map frame (i.e. the
   // continuous, non-loop-closed frame) into the global map frame (i.e. the
   // discontinuous, loop-closed frame).
-  virtual transform::Rigid3d GetLocalToGlobalTransform(
+  virtual transform::Rigid3d GetGlobalToLocalTransform(
       int trajectory_id) const = 0;
 
   // Returns the current optimized trajectories.

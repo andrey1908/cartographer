@@ -43,6 +43,15 @@ namespace mapping {
 proto::PoseGraphOptions CreatePoseGraphOptions(
     common::LuaParameterDictionary* const parameter_dictionary);
 
+enum class SubmapState { kNoConstraintSearch, kFinished };
+
+struct InternalSubmapData {
+  std::shared_ptr<const Submap> submap;
+  transform::Rigid3d global_pose;
+  SubmapState state = SubmapState::kNoConstraintSearch;
+  std::set<NodeId> node_ids;
+};
+
 class PoseGraph : public PoseGraphInterface {
 public:
   struct InitialTrajectoryPose {

@@ -33,8 +33,13 @@ struct Data {
   common::Time time;
 };
 
-struct NodeData {
-  common::Time time;
+class NodeData {
+public:
+  NodeData(const common::Time& time) : time_(time) {}
+  common::Time time() const { return time_; }
+
+public:
+  common::Time time_;
 };
 
 TEST(MapByTimeTest, AppendAndViewTrajectory) {

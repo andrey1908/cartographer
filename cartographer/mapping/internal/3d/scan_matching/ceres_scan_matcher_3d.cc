@@ -95,15 +95,12 @@ void CeresScanMatcher3D::Match(
     transform::Rigid3d* const pose_estimate,
     ceres::Solver::Summary* const summary) const {
   ceres::Problem problem;
-  optimization::CeresPose ceres_pose(
-      initial_pose_estimate, nullptr /* translation_parameterization */,
-      options_.only_optimize_yaw()
-          ? std::unique_ptr<ceres::LocalParameterization>(
-                absl::make_unique<ceres::AutoDiffLocalParameterization<
-                    YawOnlyQuaternionPlus, 4, 1>>())
-          : std::unique_ptr<ceres::LocalParameterization>(
-                absl::make_unique<ceres::QuaternionParameterization>()),
-      &problem);
+  optimization::CeresPose C_pose(initial_pose_estimate);
+  auto* rotation_parametrization = options_.only_optimize_yaw()
+      ? static_cast<ceres::LocalParameterization*>(new ceres::AutoDiffLocalParameterization<YawOnlyQuaternionPlus, 4, 1>())
+      : static_cast<ceres::LocalParameterization*>(new ceres::QuaternionParameterization());
+  problem.AddParameterBlock(C_pose.translation(), 3, nullptr);
+  problem.AddParameterBlock(C_pose.rotation(), 4, rotation_parametrization);
 
   CHECK_EQ(options_.occupied_space_weight_size(),
            point_clouds_and_hybrid_grids.size());
@@ -118,8 +115,9 @@ void CeresScanMatcher3D::Match(
             options_.occupied_space_weight(i) /
                 std::sqrt(static_cast<double>(point_cloud.size())),
             point_cloud, hybrid_grid),
-        nullptr /* loss function */, ceres_pose.translation(),
-        ceres_pose.rotation());
+        nullptr /* loss function */,
+        C_pose.translation(),
+        C_pose.rotation());
     if (point_clouds_and_hybrid_grids[i].intensity_hybrid_grid) {
       CHECK_GT(options_.intensity_cost_function_options(i).huber_scale(), 0.);
       CHECK_GT(options_.intensity_cost_function_options(i).weight(), 0.);
@@ -135,7 +133,8 @@ void CeresScanMatcher3D::Match(
               point_cloud, intensity_hybrid_grid),
           new ceres::HuberLoss(
               options_.intensity_cost_function_options(i).huber_scale()),
-          ceres_pose.translation(), ceres_pose.rotation());
+          C_pose.translation(),
+          C_pose.rotation());
     }
   }
 
@@ -143,18 +142,20 @@ void CeresScanMatcher3D::Match(
     problem.AddResidualBlock(
         TranslationDeltaCostFunctor3D::CreateAutoDiffCostFunction(
             options_.translation_weight(), target_translation),
-        nullptr /* loss function */, ceres_pose.translation());
+        nullptr /* loss function */,
+        C_pose.translation());
   }
   if (options_.rotation_weight() > 0.) {
     problem.AddResidualBlock(
         RotationDeltaCostFunctor3D::CreateAutoDiffCostFunction(
             options_.rotation_weight(), initial_pose_estimate.rotation()),
-        nullptr /* loss function */, ceres_pose.rotation());
+        nullptr /* loss function */,
+        C_pose.rotation());
   }
 
   ceres::Solve(ceres_solver_options_, &problem, summary);
 
-  *pose_estimate = ceres_pose.ToRigid();
+  *pose_estimate = C_pose.ToRigid();
 }
 
 }  // namespace scan_matching
