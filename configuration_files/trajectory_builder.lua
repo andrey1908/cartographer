@@ -18,5 +18,6 @@ TRAJECTORY_BUILDER = {
   trajectory_builder_3d = TRAJECTORY_BUILDER_3D,
   collate_fixed_frame = true,
   collate_landmarks = false,
+  use_global_odometry = false,
   log_data_frequency = true,
 }

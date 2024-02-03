@@ -73,6 +73,12 @@ class LocalTrajectoryBuilder3D {
       const sensor::TimedPointCloudData& range_data);
   void AddOdometryData(const sensor::OdometryData& odometry_data);
 
+  void SwitchToGlobalOdometryMode(
+      const MapById<NodeId, TrajectoryNode>& nodes,
+      int current_trajectory_id,
+      const std::vector<int>& localization_trajectory_ids);
+  bool InGlobalOdometryMode() const;
+
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
 
  private:
@@ -125,6 +131,8 @@ class LocalTrajectoryBuilder3D {
   std::list<transform::Rigid3d> last_poses_estimates_;
   double accum_rotation_;
   double travelled_distance_;
+
+  std::unique_ptr<Submap3D> global_submap_;
 };
 
 }  // namespace mapping

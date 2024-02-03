@@ -33,6 +33,7 @@
 #include "glog/logging.h"
 
 #include "kas_utils/collection.hpp"
+#include "kas_utils/time_measurer.h"
 
 namespace cartographer {
 namespace mapping {
@@ -74,11 +75,15 @@ std::unique_ptr<transform::Rigid3d> LocalTrajectoryBuilder3D::ScanMatch(
     const transform::Rigid3d& pose_prediction,
     const sensor::PointCloud& low_resolution_point_cloud_in_tracking,
     const sensor::PointCloud& high_resolution_point_cloud_in_tracking) {
-  if (active_submaps_.submaps().empty()) {
-    return absl::make_unique<transform::Rigid3d>(pose_prediction);
+  const mapping::Submap3D* matching_submap;
+  if (!InGlobalOdometryMode()) {
+    if (active_submaps_.submaps().empty()) {
+      return absl::make_unique<transform::Rigid3d>(pose_prediction);
+    }
+    matching_submap = active_submaps_.submaps().front().get();
+  } else {
+    matching_submap = global_submap_.get();
   }
-  std::shared_ptr<const mapping::Submap3D> matching_submap =
-      active_submaps_.submaps().front();
   transform::Rigid3d initial_ceres_pose =
       matching_submap->local_pose().inverse() * pose_prediction;
   if (options_.use_online_correlative_scan_matching()) {
@@ -406,11 +411,14 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
       filtered_range_data_in_tracking, pose_estimate->cast<float>());
 
   const auto insert_into_submap_start = std::chrono::steady_clock::now();
-  std::unique_ptr<InsertionResult> insertion_result = InsertIntoSubmap(
-      time, filtered_range_data_in_local, filtered_range_data_in_tracking,
-      high_resolution_point_cloud_in_tracking,
-      low_resolution_point_cloud_in_tracking, *pose_estimate,
-      gravity_alignment);
+  std::unique_ptr<InsertionResult> insertion_result;
+  if (!InGlobalOdometryMode()) {
+    insertion_result = InsertIntoSubmap(
+        time, filtered_range_data_in_local, filtered_range_data_in_tracking,
+        high_resolution_point_cloud_in_tracking,
+        low_resolution_point_cloud_in_tracking, *pose_estimate,
+        gravity_alignment);
+  }
   const auto insert_into_submap_stop = std::chrono::steady_clock::now();
 
   const auto insert_into_submap_duration =
@@ -511,6 +519,52 @@ LocalTrajectoryBuilder3D::InsertIntoSubmap(
                               accum_rotation_,
                               travelled_distance_}),
                       std::move(insertion_submaps)});
+}
+
+void LocalTrajectoryBuilder3D::SwitchToGlobalOdometryMode(
+      const MapById<NodeId, TrajectoryNode>& nodes,
+      int current_trajectory_id,
+      const std::vector<int>& localization_trajectory_ids) {
+  MEASURE_BLOCK_TIME(SwitchToGlobalOdometryMode);
+  CHECK(nodes.SizeOfTrajectoryOrZero(current_trajectory_id) != 0);
+  const TrajectoryNode& first_node = nodes.BeginOfTrajectory(current_trajectory_id)->data;
+  transform::Rigid3d local_to_global = first_node.constant_data->local_pose * first_node.global_pose.inverse();
+  RangeDataInserter3D range_data_inserter(options_.submaps_options().range_data_inserter_options());
+  global_submap_ = std::make_unique<Submap3D>(
+      options_.submaps_options().high_resolution(),
+      options_.submaps_options().low_resolution(),
+      transform::Rigid3d::Identity(),
+      Eigen::VectorXf::Zero(options_.rotational_histogram_size()));
+  for (int trajectory_id : localization_trajectory_ids) {
+    CHECK(nodes.SizeOfTrajectoryOrZero(trajectory_id));
+    for (const auto& [node_id, node_data] : nodes.trajectory(trajectory_id)) {
+      sensor::PointCloud point_cloud;
+      for (const sensor::RangefinderPoint& point : node_data.constant_data->high_resolution_point_cloud) {
+        point_cloud.push_back(point);
+      }
+      for (const sensor::RangefinderPoint& point : node_data.constant_data->low_resolution_point_cloud) {
+        point_cloud.push_back(point);
+      }
+      sensor::RangeData range_data{
+          Eigen::Vector3f::Zero(),
+          point_cloud};
+
+      range_data = sensor::TransformRangeData(range_data,
+          (local_to_global * node_data.global_pose).cast<float>());
+      Eigen::Quaterniond local_from_gravity_aligned =
+          node_data.constant_data->local_pose.rotation() *
+          node_data.constant_data->gravity_alignment.inverse();
+      global_submap_->InsertData(
+          range_data, range_data_inserter,
+          options_.submaps_options().high_resolution_max_range(),
+          local_from_gravity_aligned,
+          node_data.constant_data->rotational_scan_matcher_histogram);
+    }
+  }
+}
+
+bool LocalTrajectoryBuilder3D::InGlobalOdometryMode() const {
+  return global_submap_ != nullptr;
 }
 
 void LocalTrajectoryBuilder3D::RegisterMetrics(

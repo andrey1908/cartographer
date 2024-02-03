@@ -31,9 +31,9 @@ namespace mapping {
 std::unique_ptr<TrajectoryBuilderInterface> CreateGlobalTrajectoryBuilder3D(
     std::unique_ptr<LocalTrajectoryBuilder3D> local_trajectory_builder,
     const int trajectory_id, mapping::PoseGraph3D* const pose_graph,
-    const TrajectoryBuilderInterface::LocalSlamResultCallback&
-        local_slam_result_callback,
-    const absl::optional<MotionFilter>& pose_graph_odometry_motion_filter);
+    const TrajectoryBuilderInterface::LocalSlamResultCallback& local_slam_result_callback,
+    const absl::optional<MotionFilter>& pose_graph_odometry_motion_filter,
+    bool use_global_odometry);
 
 void GlobalTrajectoryBuilderRegisterMetrics(
     metrics::FamilyFactory* family_factory);

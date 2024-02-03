@@ -42,7 +42,8 @@ message TrajectoryBuilderOptions {
 
   bool collate_fixed_frame = 7;
   bool collate_landmarks = 8;
-  
+  bool use_global_odometry = 12;
+
   bool log_data_frequency = 10;
 
   MotionFilterOptions pose_graph_odometry_motion_filter = 9;

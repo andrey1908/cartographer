@@ -115,7 +115,8 @@ int MapBuilder::AddTrajectoryBuilder(
       CreateGlobalTrajectoryBuilder3D(
           std::move(local_trajectory_builder), trajectory_id,
           static_cast<PoseGraph3D*>(pose_graph_.get()),
-          local_slam_result_callback, pose_graph_odometry_motion_filter)));
+          local_slam_result_callback, pose_graph_odometry_motion_filter,
+          trajectory_options.use_global_odometry())));
 
   MaybeAddPureLocalizationTrimmer(trajectory_id, trajectory_options,
                                   pose_graph_.get());

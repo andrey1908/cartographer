@@ -44,12 +44,14 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
       std::unique_ptr<LocalTrajectoryBuilder> local_trajectory_builder,
       const int trajectory_id, PoseGraph* const pose_graph,
       const LocalSlamResultCallback& local_slam_result_callback,
-      const absl::optional<MotionFilter>& pose_graph_odometry_motion_filter)
+      const absl::optional<MotionFilter>& pose_graph_odometry_motion_filter,
+      bool use_global_odometry)
       : trajectory_id_(trajectory_id),
         pose_graph_(pose_graph),
         local_trajectory_builder_(std::move(local_trajectory_builder)),
         local_slam_result_callback_(local_slam_result_callback),
-        pose_graph_odometry_motion_filter_(pose_graph_odometry_motion_filter) {}
+        pose_graph_odometry_motion_filter_(pose_graph_odometry_motion_filter),
+        use_global_odometry_(use_global_odometry) {}
   ~GlobalTrajectoryBuilder() override {}
 
   GlobalTrajectoryBuilder(const GlobalTrajectoryBuilder&) = delete;
@@ -69,7 +71,11 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
       STOP_TIME_MEASUREMENT(odometry);
       return;
     }
+    if (local_trajectory_builder_->InGlobalOdometryMode()) {
+      CHECK(matching_result->insertion_result == nullptr);
+    }
     kLocalSlamMatchingResults->Increment();
+
     std::unique_ptr<InsertionResult> insertion_result;
     if (matching_result->insertion_result != nullptr) {
       kLocalSlamInsertionResults->Increment();
@@ -89,6 +95,29 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
           trajectory_id_, matching_result->time, matching_result->local_pose,
           std::move(matching_result->range_data_in_local),
           std::move(insertion_result));
+    }
+
+    if (use_global_odometry_ && !local_trajectory_builder_->InGlobalOdometryMode()) {
+      std::vector<std::vector<int>> connected_components = pose_graph_->GetConnectedTrajectories();
+      bool localization_done = false;
+      std::vector<int> localization_trajectories;
+      for (const std::vector<int>& connected_trajectories : connected_components) {
+        auto it = std::find(connected_trajectories.begin(), connected_trajectories.end(),
+            trajectory_id_);
+        if (it != connected_trajectories.end() && connected_trajectories.size() > 1) {
+          localization_done = true;
+          localization_trajectories = connected_trajectories;
+          int index = it - connected_trajectories.begin();
+          localization_trajectories.erase(localization_trajectories.begin() + index);
+          break;
+        }
+      }
+
+      if (localization_done) {
+        local_trajectory_builder_->SwitchToGlobalOdometryMode(
+            pose_graph_->GetTrajectoryNodes(),
+            trajectory_id_, localization_trajectories);
+      }
     }
   }
 
@@ -146,6 +175,7 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
   std::unique_ptr<LocalTrajectoryBuilder> local_trajectory_builder_;
   LocalSlamResultCallback local_slam_result_callback_;
   absl::optional<MotionFilter> pose_graph_odometry_motion_filter_;
+  bool use_global_odometry_;
 };
 
 }  // namespace
@@ -153,13 +183,14 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
 std::unique_ptr<TrajectoryBuilderInterface> CreateGlobalTrajectoryBuilder3D(
     std::unique_ptr<LocalTrajectoryBuilder3D> local_trajectory_builder,
     const int trajectory_id, mapping::PoseGraph3D* const pose_graph,
-    const TrajectoryBuilderInterface::LocalSlamResultCallback&
-        local_slam_result_callback,
-    const absl::optional<MotionFilter>& pose_graph_odometry_motion_filter) {
+    const TrajectoryBuilderInterface::LocalSlamResultCallback& local_slam_result_callback,
+    const absl::optional<MotionFilter>& pose_graph_odometry_motion_filter,
+    bool use_global_odometry) {
   return absl::make_unique<
       GlobalTrajectoryBuilder<LocalTrajectoryBuilder3D, mapping::PoseGraph3D>>(
       std::move(local_trajectory_builder), trajectory_id, pose_graph,
-      local_slam_result_callback, pose_graph_odometry_motion_filter);
+      local_slam_result_callback, pose_graph_odometry_motion_filter,
+      use_global_odometry);
 }
 
 void GlobalTrajectoryBuilderRegisterMetrics(metrics::FamilyFactory* factory) {
